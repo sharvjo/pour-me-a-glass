@@ -1,0 +1,589 @@
+import { useState, useRef } from "react";
+
+const WINE_TYPES = ["Red", "White", "Rosé", "Orange", "Sparkling", "Surprise me"];
+const DESCRIPTOR_SUGGESTIONS = [
+  "fruity", "earthy", "funky", "crisp", "tannic", "mineral", "juicy",
+  "smoky", "floral", "spicy", "buttery", "acidic", "dry", "rich",
+  "light", "bold", "silky", "peppery", "herbaceous", "fizzy"
+];
+const FOOD_SUGGESTIONS = [
+  "tacos", "birria tacos", "steak", "salmon", "pasta", "sushi", "pizza", "lamb",
+  "chicken", "oysters", "cheese", "pork", "vegetarian", "seafood", "burgers", "nothing"
+];
+const EXTRAS = ["on the cheaper side", "sustainable", "natural/low-intervention", "women-owned", "organic"];
+
+const C = {
+  bg: "#f0ebe0",
+  paper: "#f7f3ea",
+  border: "#d6ccba",
+  red: "#c8232c",
+  blue: "#1a2b5e",
+  muted: "#a09070",
+  mutedDark: "#6a5a40",
+  text: "#1a1208",
+  textBody: "#3a2e1e",
+  chip: "#ede8dc",
+  chipBorder: "#cfc8b4",
+};
+
+// ─── Suggestion Popover ───────────────────────────────────────────────────────
+
+function SuggestionPopover({ suggestions, onSelect, onClose, inputRect }) {
+  return (
+    <div style={{
+      position: "fixed",
+      top: inputRect ? inputRect.bottom + 6 : 100,
+      left: inputRect ? Math.max(8, inputRect.left - 8) : 8,
+      background: C.paper,
+      border: `2px solid ${C.blue}`,
+      borderRadius: "10px",
+      zIndex: 1000,
+      padding: "10px",
+      display: "flex",
+      flexWrap: "wrap",
+      gap: "6px",
+      maxWidth: "300px",
+      boxShadow: "3px 3px 0px rgba(26,43,94,0.15)",
+    }}>
+      {suggestions.map(s => (
+        <button key={s} onClick={() => { onSelect(s); onClose(); }} style={{
+          padding: "5px 13px", borderRadius: "20px",
+          border: `1.5px solid ${C.chipBorder}`, background: C.chip,
+          color: C.textBody, fontSize: "14px", fontFamily: "'Caveat', cursive",
+          cursor: "pointer", fontWeight: "500",
+        }}>{s}</button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Blank Input ──────────────────────────────────────────────────────────────
+
+function BlankInput({ value, onChange, placeholder, suggestions, width = "110px" }) {
+  const [focused, setFocused] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [rect, setRect] = useState(null);
+  const ref = useRef();
+
+  const handleFocus = () => {
+    setFocused(true);
+    if (ref.current) setRect(ref.current.getBoundingClientRect());
+    setShowSuggestions(true);
+  };
+
+  const filtered = suggestions.filter(s =>
+    !value || s.toLowerCase().includes(value.toLowerCase())
+  ).slice(0, 12);
+
+  return (
+    <>
+      <span style={{ display: "inline-block" }}>
+        <input
+          ref={ref}
+          value={value}
+          onChange={e => { onChange(e.target.value); if (ref.current) setRect(ref.current.getBoundingClientRect()); }}
+          onFocus={handleFocus}
+          onBlur={() => { setFocused(false); setTimeout(() => setShowSuggestions(false), 150); }}
+          placeholder={placeholder}
+          style={{
+            width, background: "transparent", border: "none",
+            borderBottom: `2.5px solid ${focused ? C.red : (value ? C.red : C.muted)}`,
+            color: value ? C.red : C.muted, fontSize: "inherit",
+            fontFamily: "'Caveat', cursive", fontWeight: value ? "700" : "400",
+            padding: "1px 4px", outline: "none", transition: "all 0.15s", textAlign: "center",
+          }}
+        />
+      </span>
+      {showSuggestions && filtered.length > 0 && (
+        <SuggestionPopover suggestions={filtered} onSelect={onChange}
+          onClose={() => setShowSuggestions(false)} inputRect={rect} />
+      )}
+    </>
+  );
+}
+
+// ─── Wine Card ────────────────────────────────────────────────────────────────
+
+const WineCard = ({ wine, index }) => {
+  const isWildcard = index === 2;
+  const labels = ["pick #1", "pick #2", "✦ wildcard"];
+  const accentColors = [C.red, C.blue, C.red];
+  return (
+    <div style={{
+      background: isWildcard ? C.blue : C.paper,
+      border: `2px solid ${isWildcard ? C.blue : C.border}`,
+      borderRadius: "12px", padding: "18px 20px",
+      boxShadow: isWildcard ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)",
+      animation: `fadeUp 0.35s ease ${index * 0.1}s both`,
+    }}>
+      <div style={{
+        fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700",
+        color: isWildcard ? "rgba(255,255,255,0.6)" : accentColors[index],
+        letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px",
+      }}>{labels[index]}</div>
+      <div style={{
+        fontSize: "20px", fontFamily: "'Caveat', cursive", fontWeight: "700",
+        color: isWildcard ? "#ffffff" : C.text, marginBottom: "3px", lineHeight: 1.2,
+      }}>{wine.name}</div>
+      {wine.grape && (
+        <div style={{
+          fontSize: "13px", color: isWildcard ? "rgba(255,255,255,0.55)" : C.muted,
+          fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500",
+        }}>{wine.grape}</div>
+      )}
+      <div style={{
+        fontSize: "14px", color: isWildcard ? "rgba(255,255,255,0.85)" : C.textBody,
+        fontFamily: "'Lora', serif", lineHeight: 1.6,
+      }}>{wine.reason}</div>
+    </div>
+  );
+};
+
+// ─── Clarification Card ───────────────────────────────────────────────────────
+
+function ClarificationCard({ clarification, onSubmit }) {
+  const [answers, setAnswers] = useState({});
+
+  const setAnswer = (key, val) => setAnswers(prev => ({ ...prev, [key]: val }));
+
+  const allAnswered = clarification.questions.every(q => answers[q.key] !== undefined);
+
+  return (
+    <div style={{
+      background: C.paper, border: `2px solid ${C.blue}`,
+      borderRadius: "14px", padding: "22px 20px",
+      boxShadow: "3px 3px 0px rgba(26,43,94,0.15)",
+      animation: "fadeUp 0.3s ease both",
+    }}>
+      <div style={{
+        fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
+        color: C.blue, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px",
+      }}>hold on a sec</div>
+      <div style={{
+        fontFamily: "'Lora', serif", fontSize: "14px", color: C.textBody,
+        lineHeight: 1.6, marginBottom: "20px",
+      }}>{clarification.intro}</div>
+
+      {clarification.questions.map(q => (
+        <div key={q.key} style={{ marginBottom: "18px" }}>
+          <div style={{
+            fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700",
+            color: C.text, marginBottom: "8px",
+          }}>{q.label}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+            {q.options.map(opt => {
+              const sel = answers[q.key] === opt.value;
+              return (
+                <button key={opt.value} onClick={() => setAnswer(q.key, opt.value)} style={{
+                  padding: "6px 14px", borderRadius: "20px",
+                  border: `2px solid ${sel ? C.red : C.chipBorder}`,
+                  background: sel ? "rgba(200,35,44,0.08)" : C.chip,
+                  color: sel ? C.red : C.mutedDark,
+                  fontSize: "14px", fontFamily: "'Caveat', cursive",
+                  fontWeight: sel ? "700" : "500", cursor: "pointer", transition: "all 0.15s",
+                }}>{opt.label}</button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <button
+        onClick={() => allAnswered && onSubmit(answers)}
+        disabled={!allAnswered}
+        style={{
+          width: "100%", padding: "14px",
+          background: allAnswered ? C.red : C.border,
+          color: allAnswered ? "#fff" : C.muted,
+          border: "none", borderRadius: "12px",
+          fontSize: "17px", fontFamily: "'Caveat', cursive", fontWeight: "700",
+          cursor: allAnswered ? "pointer" : "not-allowed", transition: "all 0.2s",
+          marginTop: "6px",
+        }}
+      >
+        try again with this →
+      </button>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function WinePicker() {
+  const [image, setImage] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
+  const [imageMime, setImageMime] = useState("image/jpeg");
+  const [wineType, setWineType] = useState("");
+  const [desc1, setDesc1] = useState("");
+  const [desc2, setDesc2] = useState("");
+  const [desc3, setDesc3] = useState("");
+  const [food, setFood] = useState("");
+  const [extras, setExtras] = useState([]);
+  const [extrasText, setExtrasText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [clarification, setClarification] = useState(null);
+  const [noMatch, setNoMatch] = useState(null);
+  const fileRef = useRef();
+
+  const handleImage = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImage(URL.createObjectURL(file));
+    setResult(null); setClarification(null); setNoMatch(null);
+    const supported = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const mime = file.type || "image/jpeg";
+    if (supported.includes(mime)) {
+      setImageMime(mime);
+      const reader = new FileReader();
+      reader.onload = ev => setImageBase64(ev.target.result.split(",")[1]);
+      reader.readAsDataURL(file);
+    } else {
+      setImageMime("image/jpeg");
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        setImageBase64(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    }
+  };
+
+  const toggleExtra = (e) => setExtras(prev =>
+    prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]
+  );
+
+  const hasEnough = imageBase64 && (wineType || desc1 || desc2 || desc3 || food);
+
+  const buildFirstPassPrompt = () => {
+    const parts = [];
+    if (wineType) parts.push(`Wine type: ${wineType}`);
+    const descs = [desc1, desc2, desc3].filter(Boolean);
+    if (descs.length) parts.push(`Descriptors: ${descs.join(", ")}`);
+    if (food) parts.push(`Food: ${food}`);
+    if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
+
+    return `You are a knowledgeable sommelier who works at a great wine bar. Concise, confident, dry wit.
+
+I've uploaded a photo of a by-the-glass wine list. My preferences: ${parts.join(". ")}
+
+MISMATCH RULE: A mismatch occurs when you cannot find a wine on the list that both (a) pairs well with the food AND (b) matches at least 2 of the stated style criteria. If there is a mismatch, do NOT force bad picks — return the clarification format instead.
+
+Scan the ENTIRE list before deciding. Food pairing is the top priority.
+
+Return ONLY one of these two JSON formats, no markdown:
+
+FORMAT A — good match found:
+{
+  "status": "match",
+  "picks": [
+    { "name": "wine name as on menu", "grape": "grape/region", "reason": "1-2 sentences, confident and specific" },
+    { "name": "wine name as on menu", "grape": "grape/region", "reason": "1-2 sentences, confident and specific" },
+    { "name": "wine name as on menu", "grape": "grape/region", "reason": "wildcard — most interesting or unusual on the list, make it sound worth ordering" }
+  ]
+}
+
+FORMAT B — mismatch detected:
+{
+  "status": "clarify",
+  "intro": "1-2 sentence honest explanation of what the conflict is, written like a cool wine bar person — e.g. 'Sparkling and birria tacos are a tough ask. The list has some good options but nothing that really nails both.'",
+  "questions": [
+    {
+      "key": "wineType",
+      "label": "How important is it that it's [wine type they asked for]?",
+      "options": [
+        { "value": "must", "label": "non-negotiable" },
+        { "value": "prefer", "label": "I'd prefer it" },
+        { "value": "flexible", "label": "flexible" }
+      ]
+    },
+    {
+      "key": "foodFirst",
+      "label": "Brief honest suggestion based on the food — e.g. 'Birria tacos really want a red. Open to it?'",
+      "options": [
+        { "value": "yes", "label": "yes, go for it" },
+        { "value": "no", "label": "stick to my criteria" }
+      ]
+    }
+  ]
+}
+
+Only include questions that are actually relevant to the conflict. Max 3 questions. Keep labels short.`;
+  };
+
+  const buildSecondPassPrompt = (clarificationAnswers) => {
+    const parts = [];
+    if (wineType) parts.push(`Original wine type request: ${wineType} (importance: ${clarificationAnswers.wineType || "flexible"})`);
+    const descs = [desc1, desc2, desc3].filter(Boolean);
+    if (descs.length) parts.push(`Style descriptors: ${descs.join(", ")}`);
+    if (food) parts.push(`Food: ${food}`);
+    if (clarificationAnswers.foodFirst === "yes") parts.push("User is open to wine type that pairs best with the food even if it differs from original request");
+    if (clarificationAnswers.wineType === "must") parts.push(`User insists on ${wineType} — prioritize this even if food pairing is imperfect`);
+    if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
+
+    return `You are a knowledgeable sommelier who works at a great wine bar. Concise, confident, dry wit.
+
+I've uploaded a photo of a by-the-glass wine list. Updated preferences after clarification: ${parts.join(". ")}
+
+Give me the best 3 picks you can. If nothing is truly good, be honest in the reason. If absolutely nothing works, return:
+{ "status": "nomatch", "message": "one dry honest sentence — tell them to change their order or skip the wine." }
+
+Otherwise return:
+{
+  "status": "match",
+  "picks": [
+    { "name": "wine name as on menu", "grape": "grape/region", "reason": "1-2 sentences, confident and specific" },
+    { "name": "wine name as on menu", "grape": "grape/region", "reason": "1-2 sentences, confident and specific" },
+    { "name": "wine name as on menu", "grape": "grape/region", "reason": "wildcard — most interesting or unusual on the list" }
+  ]
+}
+
+No markdown, no extra text.`;
+  };
+
+  const callAPI = async (prompt) => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: imageMime, data: imageBase64 } },
+            { type: "text", text: prompt }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.map(b => b.text || "").join("") || "";
+    return JSON.parse(text.replace(/```json|```/g, "").trim());
+  };
+
+  const handleSubmit = async () => {
+    if (!hasEnough) return;
+    setLoading(true);
+    setResult(null); setClarification(null); setNoMatch(null);
+    try {
+      const parsed = await callAPI(buildFirstPassPrompt());
+      if (parsed.status === "match") {
+        setResult(parsed.picks);
+      } else if (parsed.status === "clarify") {
+        setClarification(parsed);
+      } else if (parsed.status === "nomatch") {
+        setNoMatch(parsed.message);
+      }
+    } catch {
+      setNoMatch("Couldn't read the list — try a clearer photo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClarificationSubmit = async (answers) => {
+    setLoading(true);
+    setClarification(null); setResult(null); setNoMatch(null);
+    try {
+      const parsed = await callAPI(buildSecondPassPrompt(answers));
+      if (parsed.status === "match") {
+        setResult(parsed.picks);
+      } else {
+        setNoMatch(parsed.message);
+      }
+    } catch {
+      setNoMatch("Something went wrong — try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reset = () => {
+    setResult(null); setClarification(null); setNoMatch(null);
+    setImage(null); setImageBase64(null); setImageMime("image/jpeg");
+    setWineType(""); setDesc1(""); setDesc2(""); setDesc3("");
+    setFood(""); setExtras([]); setExtrasText("");
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Lora', serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+      <style>{`
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        input::placeholder { color: #b8a888; }
+        * { box-sizing: border-box; }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        borderBottom: `3px solid ${C.blue}`, borderTop: `3px solid ${C.red}`,
+        background: C.paper, padding: "22px 24px 18px", textAlign: "center",
+      }}>
+        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "42px", fontWeight: "700", color: C.red, lineHeight: 1 }}>
+          pour me a glass
+        </div>
+        <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, marginTop: "4px", fontStyle: "italic" }}>
+          snap a wine list · get your picks
+        </div>
+      </div>
+
+      <div style={{ maxWidth: "520px", margin: "0 auto", padding: "28px 20px 56px" }}>
+
+        {/* Photo upload */}
+        <div onClick={() => fileRef.current.click()} style={{
+          border: `2.5px dashed ${image ? C.red : C.border}`,
+          borderRadius: "12px", minHeight: image ? "auto" : "96px",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", overflow: "hidden",
+          background: image ? C.paper : "rgba(255,255,255,0.4)",
+          marginBottom: "24px", transition: "all 0.2s",
+        }}>
+          {image
+            ? <img src={image} alt="Wine list" style={{ width: "100%", maxHeight: "200px", objectFit: "cover", display: "block" }} />
+            : <div style={{ textAlign: "center", color: C.muted, padding: "20px" }}>
+                <div style={{ fontSize: "30px", marginBottom: "6px" }}>📸</div>
+                <div style={{ fontFamily: "'Caveat', cursive", fontSize: "17px", fontWeight: "600" }}>snap or upload the wine list</div>
+              </div>
+          }
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }} capture="environment" />
+        {image && (
+          <button onClick={() => fileRef.current.click()} style={{
+            fontSize: "13px", color: C.muted, background: "none", border: "none",
+            cursor: "pointer", fontFamily: "'Caveat', cursive", fontWeight: "600",
+            display: "block", marginBottom: "20px", marginTop: "-16px", padding: 0,
+          }}>↺ use a different photo</button>
+        )}
+
+        {/* Mad libs */}
+        <div style={{
+          background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
+          padding: "24px 22px 20px", marginBottom: "16px",
+          lineHeight: "2.8", fontSize: "19px", color: C.mutedDark,
+          fontFamily: "'Caveat', cursive", fontWeight: "500",
+          boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
+        }}>
+          {"I want a "}
+          <BlankInput value={wineType} onChange={setWineType} placeholder="type" suggestions={WINE_TYPES} width="95px" />
+          {" wine that is "}
+          <BlankInput value={desc1} onChange={setDesc1} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
+          {", "}
+          <BlankInput value={desc2} onChange={setDesc2} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
+          {", "}
+          <BlankInput value={desc3} onChange={setDesc3} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
+          {". I am eating "}
+          <BlankInput value={food} onChange={setFood} placeholder="___" suggestions={FOOD_SUGGESTIONS} width="130px" />
+          {"."}
+        </div>
+
+        {/* Extras */}
+        <div style={{
+          background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
+          padding: "18px 20px", marginBottom: "22px",
+          boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
+        }}>
+          <div style={{
+            fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
+            color: C.blue, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px",
+          }}>other things I care about</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
+            {EXTRAS.map(e => {
+              const sel = extras.includes(e);
+              return (
+                <button key={e} onClick={() => toggleExtra(e)} style={{
+                  padding: "6px 14px", borderRadius: "20px",
+                  border: `2px solid ${sel ? C.red : C.chipBorder}`,
+                  background: sel ? "rgba(200,35,44,0.08)" : C.chip,
+                  color: sel ? C.red : C.mutedDark,
+                  fontSize: "14px", fontFamily: "'Caveat', cursive",
+                  fontWeight: sel ? "700" : "500", cursor: "pointer", transition: "all 0.15s",
+                }}>{e}</button>
+              );
+            })}
+          </div>
+          <input
+            value={extrasText}
+            onChange={e => setExtrasText(e.target.value)}
+            placeholder="anything else... something from the Rhône, not too oaky..."
+            style={{
+              width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+              borderRadius: "10px", color: C.text, fontSize: "14px",
+              fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "9px 14px", outline: "none",
+            }}
+          />
+        </div>
+
+        {/* Submit */}
+        <button onClick={handleSubmit} disabled={!hasEnough || loading} style={{
+          width: "100%", padding: "16px",
+          background: hasEnough && !loading ? C.red : C.border,
+          color: hasEnough && !loading ? "#fff" : C.muted,
+          border: "none", borderRadius: "12px", fontSize: "18px",
+          fontFamily: "'Caveat', cursive", fontWeight: "700",
+          cursor: hasEnough && !loading ? "pointer" : "not-allowed",
+          transition: "all 0.2s", marginBottom: "28px",
+          boxShadow: hasEnough && !loading ? "3px 3px 0px rgba(200,35,44,0.25)" : "none",
+        }}>
+          {loading ? "reading the list..." : "get my picks →"}
+        </button>
+
+        {/* Clarification */}
+        {clarification && (
+          <ClarificationCard clarification={clarification} onSubmit={handleClarificationSubmit} />
+        )}
+
+        {/* No match */}
+        {noMatch && (
+          <div style={{
+            background: C.paper, border: `2px solid ${C.red}`, borderRadius: "14px",
+            padding: "20px 22px", boxShadow: "3px 3px 0px rgba(200,35,44,0.15)",
+            animation: "fadeUp 0.3s ease both",
+          }}>
+            <div style={{
+              fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
+              color: C.red, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "8px",
+            }}>yeah... about that</div>
+            <div style={{ fontFamily: "'Lora', serif", fontSize: "14px", color: C.textBody, lineHeight: 1.6 }}>
+              {noMatch}
+            </div>
+            <div style={{ textAlign: "center", marginTop: "14px" }}>
+              <button onClick={reset} style={{
+                fontSize: "15px", color: C.muted, background: "none", border: "none",
+                cursor: "pointer", fontFamily: "'Caveat', cursive", fontWeight: "600",
+              }}>↺ start over</button>
+            </div>
+          </div>
+        )}
+
+        {/* Results */}
+        {result && (
+          <div style={{ animation: "fadeUp 0.3s ease both" }}>
+            <div style={{
+              fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
+              color: C.blue, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px",
+            }}>your picks</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {result.map((wine, i) => <WineCard key={i} wine={wine} index={i} />)}
+            </div>
+            <div style={{ textAlign: "center", marginTop: "22px" }}>
+              <button onClick={reset} style={{
+                fontSize: "16px", color: C.muted, background: "none", border: "none",
+                cursor: "pointer", fontFamily: "'Caveat', cursive", fontWeight: "600",
+              }}>↺ start over</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, height: "4px",
+        background: `linear-gradient(to right, ${C.red} 50%, ${C.blue} 50%)`,
+      }} />
+    </div>
+  );
+}
