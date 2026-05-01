@@ -269,22 +269,24 @@ Return ONLY one of these JSON formats, no markdown:
 FORMAT A: {"status":"match","picks":[{"name":"wine name as on menu","grape":"grape/region","reason":"1-2 sentences, confident"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting on list"}]}
 FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questions":[{"key":"wineType","label":"How important is it that it is [wine type]?","options":[{"value":"must","label":"non-negotiable"},{"value":"prefer","label":"I would prefer it"},{"value":"flexible","label":"flexible"}]},{"key":"foodFirst","label":"[food-specific suggestion]?","options":[{"value":"yes","label":"yes, go for it"},{"value":"no","label":"stick to my criteria"}]}]}`;
     } else {
-      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list - give 4 wine recommendations at different levels. My preferences: ${parts.join(". ")}
+      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list. Give me exactly 4 wine recommendations. My preferences: ${parts.join(". ")}
 
-Food pairing is top priority. Each pick should name a specific wine by producer and name, not just a category.
+Food pairing is top priority. Each pick names a specific wine by producer and name.
 
-The 4 picks must be:
-1. "easy_find" - one widely available, recognizable producer anyone can find at a wine shop (the crowd-pleaser)
-2. "famous" - a well-known quality producer, the kind of name that shows up on good restaurant lists
-3. "famous" - another well-known quality producer, different style or region from #2
-4. "sommelier" - a smaller, more interesting producer that a wine bar person would recommend, the kind of bottle that starts a conversation
+YOU MUST RETURN EXACTLY 4 PICKS with these tiers in this order:
+1. tier "easy_find" - a widely available crowd-pleaser anyone can grab at a wine shop
+2. tier "famous" - a well-known quality producer, the kind on good restaurant lists
+3. tier "famous" - another well-known quality producer, different style from #2
+4. tier "sommelier" - a smaller interesting producer a wine bar person would recommend
+
+CRITICAL: Return exactly 4 objects. Each MUST have a "tier" field. Do not return 3. Do not skip the tier field.
 
 Return ONLY this JSON, no markdown:
-{"status":"match","picks":[{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"easy_find"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"sommelier"}]}`;
+{"status":"match","picks":[{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"easy_find"},{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"sommelier"}]}\`;
     }
   };
 
-  const buildSecondPassPrompt = (clarificationAnswers) => {
+    const buildSecondPassPrompt = (clarificationAnswers) => {
     const parts = [];
     if (wineType) parts.push(`Original wine type request: ${wineType} (importance: ${clarificationAnswers.wineType || "flexible"})`);
     const descs = [desc1, desc2, desc3].filter(Boolean);
