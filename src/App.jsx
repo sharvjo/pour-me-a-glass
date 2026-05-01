@@ -325,9 +325,13 @@ No markdown, no extra text.`;
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
     });
     const data = await res.json();
+    if (!res.ok) {
+      console.error("API error:", res.status, data);
+      throw new Error(data?.error?.message || data?.error || `Request failed (${res.status})`);
+    }
     const text = data.content?.map(b => b.text || "").join("") || "";
     return JSON.parse(text.replace(/```json|```/g, "").trim());
   };
