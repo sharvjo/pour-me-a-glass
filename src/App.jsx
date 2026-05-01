@@ -257,7 +257,7 @@ export default function WinePicker() {
     prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]
   );
 
-  const hasEnough = imageBase64 && (wineType || desc1 || desc2 || desc3 || food);
+  const hasEnough = wineType || desc1 || desc2 || desc3 || food;
 
   const buildFirstPassPrompt = () => {
     const parts = [];
@@ -267,52 +267,22 @@ export default function WinePicker() {
     if (food) parts.push(`Food: ${food}`);
     if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
 
-    return `You are a knowledgeable sommelier who works at a great wine bar. Concise, confident, dry wit.
+    if (imageBase64) {
+      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. I have uploaded a photo of a by-the-glass wine list. My preferences: ${parts.join(". ")}
 
-I've uploaded a photo of a by-the-glass wine list. My preferences: ${parts.join(". ")}
+MISMATCH RULE: A mismatch occurs when you cannot find a wine on the list that both (a) pairs well with the food AND (b) matches at least 2 of the stated style criteria. If mismatch, do NOT force bad picks. Scan the ENTIRE list. Food pairing is top priority.
 
-MISMATCH RULE: A mismatch occurs when you cannot find a wine on the list that both (a) pairs well with the food AND (b) matches at least 2 of the stated style criteria. If there is a mismatch, do NOT force bad picks — return the clarification format instead.
+Return ONLY one of these JSON formats, no markdown:
+FORMAT A: {"status":"match","picks":[{"name":"wine name as on menu","grape":"grape/region","reason":"1-2 sentences, confident"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting on list"}]}
+FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questions":[{"key":"wineType","label":"How important is it that it is [wine type]?","options":[{"value":"must","label":"non-negotiable"},{"value":"prefer","label":"I would prefer it"},{"value":"flexible","label":"flexible"}]},{"key":"foodFirst","label":"[food-specific suggestion]?","options":[{"value":"yes","label":"yes, go for it"},{"value":"no","label":"stick to my criteria"}]}]}`;
+    } else {
+      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list - give 3 general wine recommendations as starting points. My preferences: ${parts.join(". ")}
 
-Scan the ENTIRE list before deciding. Food pairing is the top priority.
+Food pairing is top priority. Each pick should be a style/variety/region with 2-3 example producers to look for — not a single specific bottle. Think: "Willamette Valley Pinot Noir — look for Adelsheim, A to Z, or Elk Cove."
 
-Return ONLY one of these two JSON formats, no markdown:
-
-FORMAT A — good match found:
-{
-  "status": "match",
-  "picks": [
-    { "name": "wine name as on menu", "grape": "grape/region", "reason": "1-2 sentences, confident and specific" },
-    { "name": "wine name as on menu", "grape": "grape/region", "reason": "1-2 sentences, confident and specific" },
-    { "name": "wine name as on menu", "grape": "grape/region", "reason": "wildcard — most interesting or unusual on the list, make it sound worth ordering" }
-  ]
-}
-
-FORMAT B — mismatch detected:
-{
-  "status": "clarify",
-  "intro": "1-2 sentence honest explanation of what the conflict is, written like a cool wine bar person — e.g. 'Sparkling and birria tacos are a tough ask. The list has some good options but nothing that really nails both.'",
-  "questions": [
-    {
-      "key": "wineType",
-      "label": "How important is it that it's [wine type they asked for]?",
-      "options": [
-        { "value": "must", "label": "non-negotiable" },
-        { "value": "prefer", "label": "I'd prefer it" },
-        { "value": "flexible", "label": "flexible" }
-      ]
-    },
-    {
-      "key": "foodFirst",
-      "label": "Brief honest suggestion based on the food — e.g. 'Birria tacos really want a red. Open to it?'",
-      "options": [
-        { "value": "yes", "label": "yes, go for it" },
-        { "value": "no", "label": "stick to my criteria" }
-      ]
+Return ONLY this JSON, no markdown:
+{"status":"match","picks":[{"name":"Style or variety recommendation","grape":"region/grape","reason":"1-2 sentences on why it fits + 2-3 producers to look for"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting or unexpected direction to explore"}]}`;
     }
-  ]
-}
-
-Only include questions that are actually relevant to the conflict. Max 3 questions. Keep labels short.`;
   };
 
   const buildSecondPassPrompt = (clarificationAnswers) => {
@@ -346,27 +316,23 @@ No markdown, no extra text.`;
   };
 
   const callAPI = async (prompt) => {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const msgContent = imageBase64
+      ? [
+          { type: "image", source: { type: "base64", media_type: imageMime, data: imageBase64 } },
+          { type: "text", text: prompt }
+        ]
+      : [{ type: "text", text: prompt }];
+    const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: imageMime, data: imageBase64 } },
-            { type: "text", text: prompt }
-          ]
-        }]
-      })
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
     });
     const data = await res.json();
     const text = data.content?.map(b => b.text || "").join("") || "";
     return JSON.parse(text.replace(/```json|```/g, "").trim());
   };
 
-  const handleSubmit = async () => {
+    const handleSubmit = async () => {
     if (!hasEnough) return;
     setLoading(true);
     setResult(null); setClarification(null); setNoMatch(null);
@@ -380,7 +346,7 @@ No markdown, no extra text.`;
         setNoMatch(parsed.message);
       }
     } catch {
-      setNoMatch("Couldn't read the list — try a clearer photo.");
+      setNoMatch(imageBase64 ? "Couldn't read the list — try a clearer photo." : "Something went wrong — try again.");
     } finally {
       setLoading(false);
     }
@@ -447,11 +413,11 @@ No markdown, no extra text.`;
             ? <img src={image} alt="Wine list" style={{ width: "100%", maxHeight: "200px", objectFit: "cover", display: "block" }} />
             : <div style={{ textAlign: "center", color: C.muted, padding: "20px" }}>
                 <div style={{ fontSize: "30px", marginBottom: "6px" }}>📸</div>
-                <div style={{ fontFamily: "'Caveat', cursive", fontSize: "17px", fontWeight: "600" }}>snap or upload the wine list</div>
+                <div style={{ fontFamily: "'Caveat', cursive", fontSize: "17px", fontWeight: "600" }}>snap or upload a wine list (optional)</div>
               </div>
           }
         </div>
-        <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }} capture="environment" />
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }}  />
         {image && (
           <button onClick={() => fileRef.current.click()} style={{
             fontSize: "13px", color: C.muted, background: "none", border: "none",
@@ -529,7 +495,7 @@ No markdown, no extra text.`;
           transition: "all 0.2s", marginBottom: "28px",
           boxShadow: hasEnough && !loading ? "3px 3px 0px rgba(200,35,44,0.25)" : "none",
         }}>
-          {loading ? "reading the list..." : "get my picks →"}
+          {loading ? (imageBase64 ? "reading the list..." : "finding your wines...") : (imageBase64 ? "get my picks →" : "just recommend me something →")}
         </button>
 
         {/* Clarification */}
