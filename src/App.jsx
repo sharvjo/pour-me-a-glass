@@ -271,18 +271,22 @@ FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questio
     } else {
       return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list. Give me exactly 4 wine recommendations. My preferences: ${parts.join(". ")}
 
-Food pairing is top priority. Each pick names a specific wine by producer and name.
+Food pairing is top priority.
+
+Each pick's "name" should be a wine STYLE, REGION, or TYPE (e.g. "Bordeaux Margaux", "Willamette Valley Pinot Noir", "Alsatian Riesling"). NOT a specific bottle.
+
+The "reason" should be 2-3 sentences with real personality. Lead with the vibe and characteristics -- what does it taste like, what mood is it, why did you pick it for this person. Then end with producers to look for. Think: "This is the wine you drink on a Tuesday when you want to feel fancy without trying. Bright citrus, wet stone, and a finish that sticks around. Look for Domaine Vacheron, Pascal Jolivet, or Lucien Crochet."
 
 YOU MUST RETURN EXACTLY 4 PICKS with these tiers in this order:
-1. tier "easy_find" - a widely available crowd-pleaser anyone can grab at a wine shop
-2. tier "famous" - a well-known quality producer, the kind on good restaurant lists
-3. tier "famous" - another well-known quality producer, different style from #2
-4. tier "sommelier" - a smaller interesting producer a wine bar person would recommend
+1. tier "easy_find" - a style/region that is widely available and approachable
+2. tier "famous" - a well-known quality style/region with respected producers
+3. tier "famous" - another well-known style/region, different from #2
+4. tier "sommelier" - a less obvious style/region a wine bar person would suggest
 
-CRITICAL: Return exactly 4 objects. Each MUST have a "tier" field. Do not return 3. Do not skip the tier field.
+CRITICAL: Return exactly 4 objects. Each MUST have a "tier" field.
 
 Return ONLY this JSON, no markdown:
-{"status":"match","picks":[{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"easy_find"},{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"sommelier"}]}\`;
+{"status":"match","picks":[{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"easy_find"},{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"famous"},{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"famous"},{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"sommelier"}]}`;
     }
   };
 
