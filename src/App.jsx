@@ -104,42 +104,35 @@ function BlankInput({ value, onChange, placeholder, suggestions, width = "110px"
 
 // ─── Wine Card ────────────────────────────────────────────────────────────────
 
+const TIER_CONFIG = {
+  easy_find: { label: "easy find", color: "#2a7d4f", bg: "#f0f9f4", border: "#c8e6d4" },
+  famous: { label: "well-known pick", color: "#1a2b5e", bg: "#f7f3ea", border: "#d6ccba" },
+  sommelier: { label: "✦ sommelier pick", color: "#c8232c", bg: "#1a1208", border: "#1a1208" },
+};
+
+const MENU_LABELS = ["pick #1", "pick #2", "✦ wildcard"];
+const MENU_COLORS = ["#c8232c", "#1a2b5e", "#c8232c"];
+
 const WineCard = ({ wine, index }) => {
-  const isWildcard = index === 2;
-  const labels = ["pick #1", "pick #2", "✦ wildcard"];
-  const accentColors = [C.red, C.blue, C.red];
+  const tier = wine.tier && TIER_CONFIG[wine.tier];
+  const isMenuWildcard = !tier && index === 2;
+  const isSommelier = tier && wine.tier === "sommelier";
+  const isDark = isMenuWildcard || isSommelier;
+
+  const label = tier ? TIER_CONFIG[wine.tier].label : MENU_LABELS[index] || ("pick #" + (index + 1));
+  const labelColor = tier ? TIER_CONFIG[wine.tier].color : (isMenuWildcard ? "rgba(255,255,255,0.6)" : MENU_COLORS[index] || "#c8232c");
+  const cardBg = isDark ? (isSommelier ? TIER_CONFIG.sommelier.bg : "#1a2b5e") : (tier ? TIER_CONFIG[wine.tier].bg : "#f7f3ea");
+  const cardBorder = isDark ? (isSommelier ? TIER_CONFIG.sommelier.border : "#1a2b5e") : (tier ? TIER_CONFIG[wine.tier].border : "#d6ccba");
+
   return (
-    <div style={{
-      background: isWildcard ? C.blue : C.paper,
-      border: `2px solid ${isWildcard ? C.blue : C.border}`,
-      borderRadius: "12px", padding: "18px 20px",
-      boxShadow: isWildcard ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)",
-      animation: `fadeUp 0.35s ease ${index * 0.1}s both`,
-    }}>
-      <div style={{
-        fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700",
-        color: isWildcard ? "rgba(255,255,255,0.6)" : accentColors[index],
-        letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px",
-      }}>{labels[index]}</div>
-      <div style={{
-        fontSize: "20px", fontFamily: "'Caveat', cursive", fontWeight: "700",
-        color: isWildcard ? "#ffffff" : C.text, marginBottom: "3px", lineHeight: 1.2,
-      }}>{wine.name}</div>
-      {wine.grape && (
-        <div style={{
-          fontSize: "13px", color: isWildcard ? "rgba(255,255,255,0.55)" : C.muted,
-          fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500",
-        }}>{wine.grape}</div>
-      )}
-      <div style={{
-        fontSize: "14px", color: isWildcard ? "rgba(255,255,255,0.85)" : C.textBody,
-        fontFamily: "'Lora', serif", lineHeight: 1.6,
-      }}>{wine.reason}</div>
+    <div style={{ background: cardBg, border: `2px solid ${cardBorder}`, borderRadius: "12px", padding: "18px 20px", boxShadow: isDark ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)", animation: `fadeUp 0.35s ease ${index * 0.1}s both` }}>
+      <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700", color: isDark ? "rgba(255,255,255,0.7)" : labelColor, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>{label}</div>
+      <div style={{ fontSize: "20px", fontFamily: "'Caveat', cursive", fontWeight: "700", color: isDark ? "#ffffff" : "#1a1208", marginBottom: "3px", lineHeight: 1.2 }}>{wine.name}</div>
+      {wine.grape && <div style={{ fontSize: "13px", color: isDark ? "rgba(255,255,255,0.55)" : "#a09070", fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500" }}>{wine.grape}</div>}
+      <div style={{ fontSize: "14px", color: isDark ? "rgba(255,255,255,0.85)" : "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.6 }}>{wine.reason}</div>
     </div>
   );
 };
-
-// ─── Clarification Card ───────────────────────────────────────────────────────
 
 function ClarificationCard({ clarification, onSubmit }) {
   const [answers, setAnswers] = useState({});
@@ -276,12 +269,18 @@ Return ONLY one of these JSON formats, no markdown:
 FORMAT A: {"status":"match","picks":[{"name":"wine name as on menu","grape":"grape/region","reason":"1-2 sentences, confident"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting on list"}]}
 FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questions":[{"key":"wineType","label":"How important is it that it is [wine type]?","options":[{"value":"must","label":"non-negotiable"},{"value":"prefer","label":"I would prefer it"},{"value":"flexible","label":"flexible"}]},{"key":"foodFirst","label":"[food-specific suggestion]?","options":[{"value":"yes","label":"yes, go for it"},{"value":"no","label":"stick to my criteria"}]}]}`;
     } else {
-      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list - give 3 general wine recommendations as starting points. My preferences: ${parts.join(". ")}
+      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list - give 4 wine recommendations at different levels. My preferences: ${parts.join(". ")}
 
-Food pairing is top priority. Each pick should be a style/variety/region with 2-3 example producers to look for — not a single specific bottle. Think: "Willamette Valley Pinot Noir — look for Adelsheim, A to Z, or Elk Cove."
+Food pairing is top priority. Each pick should name a specific wine by producer and name, not just a category.
+
+The 4 picks must be:
+1. "easy_find" - one widely available, recognizable producer anyone can find at a wine shop (the crowd-pleaser)
+2. "famous" - a well-known quality producer, the kind of name that shows up on good restaurant lists
+3. "famous" - another well-known quality producer, different style or region from #2
+4. "sommelier" - a smaller, more interesting producer that a wine bar person would recommend, the kind of bottle that starts a conversation
 
 Return ONLY this JSON, no markdown:
-{"status":"match","picks":[{"name":"Style or variety recommendation","grape":"region/grape","reason":"1-2 sentences on why it fits + 2-3 producers to look for"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting or unexpected direction to explore"}]}`;
+{"status":"match","picks":[{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"easy_find"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"sommelier"}]}`;
     }
   };
 
@@ -325,13 +324,9 @@ No markdown, no extra text.`;
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
+      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
     });
     const data = await res.json();
-    if (!res.ok) {
-      console.error("API error:", res.status, data);
-      throw new Error(data?.error?.message || data?.error || `Request failed (${res.status})`);
-    }
     const text = data.content?.map(b => b.text || "").join("") || "";
     return JSON.parse(text.replace(/```json|```/g, "").trim());
   };
