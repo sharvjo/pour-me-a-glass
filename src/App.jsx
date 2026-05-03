@@ -514,7 +514,7 @@ No markdown, no extra text.`;
           <input
             value={winesILove}
             onChange={e => setWinesILove(e.target.value)}
-            placeholder="Mullineux Kloof Street, anything from Hamilton Russell, Sancerre..."
+            placeholder="Gulp Hablo, Bordeaux, Ruinart Blanc de Blanc"
             style={{
               width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
               borderRadius: "10px", color: C.text, fontSize: "14px",
