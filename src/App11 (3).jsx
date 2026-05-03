@@ -49,7 +49,7 @@ function SuggestionPopover({ suggestions, onSelect, onClose, inputRect }) {
       boxShadow: "3px 3px 0px rgba(26,43,94,0.15)",
     }}>
       {suggestions.map(s => (
-        <button key={s} onClick={() => { onSelect(s); onClose(); }} style={{
+        <button key={s} onMouseDown={e => { e.preventDefault(); onSelect(s); onClose(); }} style={{
           padding: "5px 13px", borderRadius: "20px",
           border: `1.5px solid ${C.chipBorder}`, background: C.chip,
           color: C.textBody, fontSize: "14px", fontFamily: "'Caveat', cursive",
@@ -132,17 +132,19 @@ const WineCard = ({ wine, index, onSave, isSaved }) => {
   const isMenuWildcard = !tier && index === 2;
   const isSommelier = tier && wine.tier === "sommelier";
   const isDark = isMenuWildcard || isSommelier;
+  const isStyleCard = !!wine.style; // no-photo format
 
   const label = tier ? TIER_CONFIG[wine.tier].label : MENU_LABELS[index] || ("pick #" + (index + 1));
   const labelColor = tier ? TIER_CONFIG[wine.tier].color : (isMenuWildcard ? "rgba(255,255,255,0.6)" : MENU_COLORS[index] || "#c8232c");
   const cardBg = isDark ? (isSommelier ? TIER_CONFIG.sommelier.bg : "#1a2b5e") : (tier ? TIER_CONFIG[wine.tier].bg : "#f7f3ea");
   const cardBorder = isDark ? (isSommelier ? TIER_CONFIG.sommelier.border : "#1a2b5e") : (tier ? TIER_CONFIG[wine.tier].border : "#d6ccba");
   const glassColor = isDark ? (isSaved ? "#ffffff" : "rgba(255,255,255,0.4)") : (isSaved ? C.red : C.muted);
+  const saveKey = wine.style || wine.name;
 
   return (
     <div style={{ position: "relative", background: cardBg, border: `2px solid ${cardBorder}`, borderRadius: "12px", padding: "18px 20px", boxShadow: isDark ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)", animation: `fadeUp 0.35s ease ${index * 0.1}s both` }}>
       <button
-        onClick={() => onSave(wine)}
+        onClick={() => onSave({ ...wine, name: saveKey })}
         title={isSaved ? "saved!" : "save this pick"}
         style={{
           position: "absolute", top: "12px", left: "14px",
@@ -154,11 +156,28 @@ const WineCard = ({ wine, index, onSave, isSaved }) => {
       >
         <WineGlassIcon size={20} color={glassColor} filled={isSaved} />
       </button>
+
       <div style={{ paddingLeft: "26px" }}>
         <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700", color: isDark ? "rgba(255,255,255,0.7)" : labelColor, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>{label}</div>
-        <div style={{ fontSize: "20px", fontFamily: "'Caveat', cursive", fontWeight: "700", color: isDark ? "#ffffff" : "#1a1208", marginBottom: "3px", lineHeight: 1.2 }}>{wine.name}</div>
-        {wine.grape && <div style={{ fontSize: "13px", color: isDark ? "rgba(255,255,255,0.55)" : "#a09070", fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500" }}>{wine.grape}</div>}
-        <div style={{ fontSize: "14px", color: isDark ? "rgba(255,255,255,0.85)" : "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.6 }}>{wine.reason}</div>
+
+        {isStyleCard ? (
+          <>
+            <div style={{ fontSize: "22px", fontFamily: "'Caveat', cursive", fontWeight: "700", color: isDark ? "#ffffff" : "#1a1208", marginBottom: "2px", lineHeight: 1.2 }}>{wine.style}</div>
+            <div style={{ fontSize: "13px", color: isDark ? "rgba(255,255,255,0.55)" : "#a09070", fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500" }}>{wine.region}</div>
+            <div style={{ fontSize: "14px", color: isDark ? "rgba(255,255,255,0.85)" : "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.6, marginBottom: "10px" }}>{wine.description}</div>
+            {wine.producers && wine.producers.length > 0 && (
+              <div style={{ fontSize: "13px", color: isDark ? "rgba(255,255,255,0.6)" : C.mutedDark, fontFamily: "'Lora', serif", fontStyle: "italic", lineHeight: 1.5 }}>
+                Try producers like {wine.producers.slice(0, -1).join(", ")}{wine.producers.length > 1 ? `, and ${wine.producers[wine.producers.length - 1]}` : wine.producers[0]}.
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: "20px", fontFamily: "'Caveat', cursive", fontWeight: "700", color: isDark ? "#ffffff" : "#1a1208", marginBottom: "3px", lineHeight: 1.2 }}>{wine.name}</div>
+            {wine.grape && <div style={{ fontSize: "13px", color: isDark ? "rgba(255,255,255,0.55)" : "#a09070", fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500" }}>{wine.grape}</div>}
+            <div style={{ fontSize: "14px", color: isDark ? "rgba(255,255,255,0.85)" : "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.6 }}>{wine.reason}</div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -325,18 +344,17 @@ Return ONLY one of these JSON formats, no markdown:
 FORMAT A: {"status":"match","picks":[{"name":"wine name as on menu","grape":"grape/region","reason":"1-2 sentences, confident"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting on list"}]}
 FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questions":[{"key":"wineType","label":"How important is it that it is [wine type]?","options":[{"value":"must","label":"non-negotiable"},{"value":"prefer","label":"I would prefer it"},{"value":"flexible","label":"flexible"}]},{"key":"foodFirst","label":"[food-specific suggestion]?","options":[{"value":"yes","label":"yes, go for it"},{"value":"no","label":"stick to my criteria"}]}]}`;
     } else {
-      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list - give 4 wine recommendations at different levels. My preferences: ${parts.join(". ")}
+      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list — give 3 style-based recommendations. My preferences: ${parts.join(". ")}
 
-Food pairing is top priority. Each pick should name a specific wine by producer and name, not just a category.
+Food pairing is top priority. Each pick is a style/region, not a single bottle.
 
-The 4 picks must be:
-1. "easy_find" - one widely available, recognizable producer anyone can find at a wine shop (the crowd-pleaser)
-2. "famous" - a well-known quality producer, the kind of name that shows up on good restaurant lists
-3. "famous" - another well-known quality producer, different style or region from #2
-4. "sommelier" - a smaller, more interesting producer that a wine bar person would recommend, the kind of bottle that starts a conversation
+The 3 picks must be:
+1. tier "easy_find" — approachable, crowd-pleasing, widely available
+2. tier "famous" — a well-known classic that shows up on good restaurant lists
+3. tier "sommelier" — something more interesting or unexpected a wine bar person would recommend
 
 Return ONLY this JSON, no markdown:
-{"status":"match","picks":[{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"easy_find"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"sommelier"}]}`;
+{"status":"match","picks":[{"style":"Albariño","region":"Rías Baixas, Spain","description":"2 sentences: what it tastes like and why it works for their ask","tier":"easy_find","producers":["Producer 1","Producer 2","Producer 3","Producer 4"]},{"style":"...","region":"...","description":"...","tier":"famous","producers":["...","...","...","..."]},{"style":"...","region":"...","description":"...","tier":"sommelier","producers":["...","...","...","..."]}]}`;
     }
   };
 
@@ -650,7 +668,7 @@ No markdown, no extra text.`;
               color: C.blue, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px",
             }}>your picks</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {result.map((wine, i) => <WineCard key={i} wine={wine} index={i} onSave={handleSaveWine} isSaved={savedNames.has(wine.name)} />)}
+              {result.map((wine, i) => <WineCard key={i} wine={wine} index={i} onSave={handleSaveWine} isSaved={savedNames.has(wine.style || wine.name)} />)}
             </div>
             <div style={{ textAlign: "center", marginTop: "22px" }}>
               <button onClick={reset} style={{
