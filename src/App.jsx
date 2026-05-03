@@ -217,6 +217,7 @@ export default function WinePicker() {
   const [food, setFood] = useState("");
   const [extras, setExtras] = useState([]);
   const [extrasText, setExtrasText] = useState("");
+  const [winesILove, setWinesILove] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [clarification, setClarification] = useState(null);
@@ -264,6 +265,7 @@ export default function WinePicker() {
     if (dontWant) parts.push(`Dealbreakers (must avoid): ${dontWant}`);
     if (food) parts.push(`Food: ${food}`);
     if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
+    if (winesILove) parts.push(`Wines they already love (use to calibrate style): ${winesILove}`);
 
     if (imageBase64) {
       return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. I have uploaded a photo of a by-the-glass wine list. My preferences: ${parts.join(". ")}
@@ -299,6 +301,7 @@ Return ONLY this JSON, no markdown:
     if (clarificationAnswers.foodFirst === "yes") parts.push("User is open to wine type that pairs best with the food even if it differs from original request");
     if (clarificationAnswers.wineType === "must") parts.push(`User insists on ${wineType} — prioritize this even if food pairing is imperfect`);
     if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
+    if (winesILove) parts.push(`Wines they already love (use to calibrate style): ${winesILove}`);
 
     return `You are a knowledgeable sommelier who works at a great wine bar. Concise, confident, dry wit.
 
@@ -378,7 +381,7 @@ No markdown, no extra text.`;
     setResult(null); setClarification(null); setNoMatch(null);
     setImage(null); setImageBase64(null); setImageMime("image/jpeg");
     setWineType(""); setDesc1(""); setDesc2(""); setDesc3(""); setDontWant("");
-    setFood(""); setExtras([]); setExtrasText("");
+    setFood(""); setExtras([]); setExtrasText(""); setWinesILove("");
   };
 
   return (
@@ -464,7 +467,7 @@ No markdown, no extra text.`;
         {/* Extras */}
         <div style={{
           background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
-          padding: "18px 20px", marginBottom: "22px",
+          padding: "18px 20px", marginBottom: "16px",
           boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
         }}>
           <div style={{
@@ -490,6 +493,28 @@ No markdown, no extra text.`;
             value={extrasText}
             onChange={e => setExtrasText(e.target.value)}
             placeholder="anything else... something from the Rhône, not too oaky..."
+            style={{
+              width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+              borderRadius: "10px", color: C.text, fontSize: "14px",
+              fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "9px 14px", outline: "none",
+            }}
+          />
+        </div>
+
+        {/* Wines I love */}
+        <div style={{
+          background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
+          padding: "18px 20px", marginBottom: "22px",
+          boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
+        }}>
+          <div style={{
+            fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
+            color: C.blue, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px",
+          }}>wines I already love</div>
+          <input
+            value={winesILove}
+            onChange={e => setWinesILove(e.target.value)}
+            placeholder="Mullineux Kloof Street, anything from Hamilton Russell, Sancerre..."
             style={{
               width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
               borderRadius: "10px", color: C.text, fontSize: "14px",
