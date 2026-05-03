@@ -105,6 +105,17 @@ function BlankInput({ value, onChange, placeholder, suggestions, width = "110px"
   );
 }
 
+// ─── Wine Glass Icon ──────────────────────────────────────────────────────────
+
+const WineGlassIcon = ({ size = 22, color = "currentColor", filled = false }) => (
+  <svg width={size} height={size} viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M25 10 Q20 40 30 60 Q38 75 50 80 Q62 75 70 60 Q80 40 75 10 Z" stroke={color} strokeWidth="5" fill={filled ? color : "none"} strokeLinejoin="round"/>
+    <path d="M35 45 Q45 50 55 44" stroke={color} strokeWidth="4" fill="none" strokeLinecap="round"/>
+    <line x1="50" y1="80" x2="50" y2="108" stroke={color} strokeWidth="5" strokeLinecap="round"/>
+    <path d="M33 108 Q50 104 67 108" stroke={color} strokeWidth="5" strokeLinecap="round"/>
+  </svg>
+);
+
 // ─── Wine Card ────────────────────────────────────────────────────────────────
 
 const TIER_CONFIG = {
@@ -126,232 +137,32 @@ const WineCard = ({ wine, index, onSave, isSaved }) => {
   const labelColor = tier ? TIER_CONFIG[wine.tier].color : (isMenuWildcard ? "rgba(255,255,255,0.6)" : MENU_COLORS[index] || "#c8232c");
   const cardBg = isDark ? (isSommelier ? TIER_CONFIG.sommelier.bg : "#1a2b5e") : (tier ? TIER_CONFIG[wine.tier].bg : "#f7f3ea");
   const cardBorder = isDark ? (isSommelier ? TIER_CONFIG.sommelier.border : "#1a2b5e") : (tier ? TIER_CONFIG[wine.tier].border : "#d6ccba");
+  const glassColor = isDark ? (isSaved ? "#ffffff" : "rgba(255,255,255,0.4)") : (isSaved ? C.red : C.muted);
 
   return (
-    <div style={{ background: cardBg, border: `2px solid ${cardBorder}`, borderRadius: "12px", padding: "18px 20px", boxShadow: isDark ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)", animation: `fadeUp 0.35s ease ${index * 0.1}s both`, position: "relative" }}>
-      <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700", color: isDark ? "rgba(255,255,255,0.7)" : labelColor, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>{label}</div>
-      <div style={{ fontSize: "20px", fontFamily: "'Caveat', cursive", fontWeight: "700", color: isDark ? "#ffffff" : "#1a1208", marginBottom: "3px", lineHeight: 1.2 }}>{wine.name}</div>
-      {wine.grape && <div style={{ fontSize: "13px", color: isDark ? "rgba(255,255,255,0.55)" : "#a09070", fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500" }}>{wine.grape}</div>}
-      <div style={{ fontSize: "14px", color: isDark ? "rgba(255,255,255,0.85)" : "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.6 }}>{wine.reason}</div>
-      <button onClick={() => onSave(wine)} style={{
-        position: "absolute", top: "14px", right: "14px",
-        background: "none", border: "none", cursor: "pointer",
-        fontSize: "20px", lineHeight: 1, padding: "2px",
-        opacity: isSaved ? 1 : 0.4, transition: "opacity 0.2s, transform 0.15s",
-      }}
-        title={isSaved ? "saved!" : "save this wine"}
-        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.2)"}
-        onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-      >🍷</button>
-    </div>
-  );
-};
-
-// ─── Rating Modal ─────────────────────────────────────────────────────────────
-
-function RatingModal({ wine, mode, onSave, onClose }) {
-  const [rating, setRating] = useState(null);
-  const [location, setLocation] = useState("");
-  const [locationLoading, setLocationLoading] = useState(true);
-  const [eating, setEating] = useState("");
-  const [notes, setNotes] = useState("");
-
-  useState(() => {
-    if (!navigator.geolocation) { setLocationLoading(false); return; }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
-          const data = await res.json();
-          const addr = data.address;
-          const place = addr.restaurant || addr.bar || addr.cafe || addr.amenity || addr.neighbourhood || addr.suburb || addr.city_district || addr.city || addr.town || "";
-          setLocation(place);
-        } catch { setLocation(""); }
-        setLocationLoading(false);
-      },
-      () => { setLocationLoading(false); }
-    );
-  }, []);
-
-  const RATINGS = [
-    { value: "disliked", label: "👎", desc: "didn't like" },
-    { value: "liked", label: "👍", desc: "liked" },
-    { value: "loved", label: "👍👍", desc: "loved" },
-  ];
-
-  return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(26,18,8,0.6)",
-      zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center",
-      animation: "fadeUp 0.2s ease both",
-    }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{
-        background: C.paper, borderRadius: "18px 18px 0 0",
-        border: `2px solid ${C.border}`, borderBottom: "none",
-        padding: "28px 24px 40px", width: "100%", maxWidth: "520px",
-        boxShadow: "0 -4px 24px rgba(0,0,0,0.15)",
-      }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
-          <div>
-            <div style={{ fontFamily: "'Caveat', cursive", fontSize: "22px", fontWeight: "700", color: C.text, lineHeight: 1.2 }}>{wine.name}</div>
-            {wine.grape && <div style={{ fontFamily: "'Caveat', cursive", fontSize: "14px", color: C.muted, marginTop: "2px" }}>{wine.grape}</div>}
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: C.muted, padding: 0 }}>✕</button>
-        </div>
-
-        {/* Rating */}
-        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700", color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "10px" }}>how was it?</div>
-        <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-          {RATINGS.map(r => {
-            const sel = rating === r.value;
-            return (
-              <button key={r.value} onClick={() => setRating(r.value)} style={{
-                flex: 1, padding: "10px 6px", borderRadius: "12px",
-                border: `2px solid ${sel ? C.red : C.chipBorder}`,
-                background: sel ? "rgba(200,35,44,0.08)" : C.chip,
-                cursor: "pointer", transition: "all 0.15s", textAlign: "center",
-              }}>
-                <div style={{ fontSize: "22px", lineHeight: 1 }}>{r.label}</div>
-                <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", color: sel ? C.red : C.mutedDark, fontWeight: sel ? "700" : "500", marginTop: "4px" }}>{r.desc}</div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Location */}
-        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700", color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>where are you?</div>
-        <input
-          value={locationLoading ? "" : location}
-          onChange={e => setLocation(e.target.value)}
-          placeholder={locationLoading ? "detecting location..." : "restaurant, bar, city..."}
-          style={{
-            width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
-            borderRadius: "10px", color: C.text, fontSize: "14px",
-            fontFamily: "'Caveat', cursive", fontWeight: "500",
-            padding: "9px 14px", outline: "none", marginBottom: "14px", boxSizing: "border-box",
-          }}
-        />
-
-        {/* What you ate */}
-        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700", color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>what were you eating?</div>
-        <input
-          value={eating}
-          onChange={e => setEating(e.target.value)}
-          placeholder="steak frites, lamb chops, cheese board..."
-          style={{
-            width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
-            borderRadius: "10px", color: C.text, fontSize: "14px",
-            fontFamily: "'Caveat', cursive", fontWeight: "500",
-            padding: "9px 14px", outline: "none", marginBottom: "14px", boxSizing: "border-box",
-          }}
-        />
-
-        {/* Notes */}
-        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700", color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>notes (optional)</div>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="really earthy, opened up after 10 mins, would order again..."
-          rows={2}
-          style={{
-            width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
-            borderRadius: "10px", color: C.text, fontSize: "14px",
-            fontFamily: "'Caveat', cursive", fontWeight: "500",
-            padding: "9px 14px", outline: "none", resize: "none",
-            marginBottom: "20px", boxSizing: "border-box",
-          }}
-        />
-
-        <button
-          onClick={() => rating && onSave({ rating, location, eating, notes, mode })}
-          disabled={!rating}
-          style={{
-            width: "100%", padding: "14px",
-            background: rating ? C.red : C.border,
-            color: rating ? "#fff" : C.muted,
-            border: "none", borderRadius: "12px",
-            fontSize: "17px", fontFamily: "'Caveat', cursive", fontWeight: "700",
-            cursor: rating ? "pointer" : "not-allowed", transition: "all 0.2s",
-          }}
-        >save this wine →</button>
+    <div style={{ position: "relative", background: cardBg, border: `2px solid ${cardBorder}`, borderRadius: "12px", padding: "18px 20px", boxShadow: isDark ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)", animation: `fadeUp 0.35s ease ${index * 0.1}s both` }}>
+      <button
+        onClick={() => onSave(wine)}
+        title={isSaved ? "saved!" : "save this pick"}
+        style={{
+          position: "absolute", top: "12px", left: "14px",
+          background: "none", border: "none", cursor: isSaved ? "default" : "pointer",
+          padding: "2px", opacity: isSaved ? 1 : 0.5,
+          transition: "opacity 0.2s, transform 0.15s",
+          transform: isSaved ? "scale(1.15)" : "scale(1)",
+        }}
+      >
+        <WineGlassIcon size={20} color={glassColor} filled={isSaved} />
+      </button>
+      <div style={{ paddingLeft: "26px" }}>
+        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700", color: isDark ? "rgba(255,255,255,0.7)" : labelColor, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>{label}</div>
+        <div style={{ fontSize: "20px", fontFamily: "'Caveat', cursive", fontWeight: "700", color: isDark ? "#ffffff" : "#1a1208", marginBottom: "3px", lineHeight: 1.2 }}>{wine.name}</div>
+        {wine.grape && <div style={{ fontSize: "13px", color: isDark ? "rgba(255,255,255,0.55)" : "#a09070", fontFamily: "'Caveat', cursive", marginBottom: "10px", fontWeight: "500" }}>{wine.grape}</div>}
+        <div style={{ fontSize: "14px", color: isDark ? "rgba(255,255,255,0.85)" : "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.6 }}>{wine.reason}</div>
       </div>
     </div>
   );
-}
-
-// ─── Saved Wines Section ──────────────────────────────────────────────────────
-
-function SavedWines({ saved, onClear }) {
-  const [open, setOpen] = useState(false);
-  if (saved.length === 0) return null;
-
-  const RATING_ORDER = ["loved", "liked", "disliked"];
-  const RATING_LABELS = { loved: "👍👍 loved", liked: "👍 liked", disliked: "👎 didn't like" };
-
-  const grouped = RATING_ORDER.reduce((acc, r) => {
-    const wines = saved.filter(w => w.rating === r).sort((a, b) => b.savedAt - a.savedAt);
-    if (wines.length) acc[r] = wines;
-    return acc;
-  }, {});
-
-  return (
-    <div style={{ borderTop: `3px solid ${C.border}`, marginTop: "40px", paddingTop: "28px" }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0,
-      }}>
-        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "20px", fontWeight: "700", color: C.blue }}>
-          my wines 🍷 <span style={{ fontSize: "14px", color: C.muted, fontWeight: "500" }}>({saved.length})</span>
-        </div>
-        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "18px", color: C.muted }}>{open ? "▲" : "▼"}</div>
-      </button>
-
-      {open && (
-        <div style={{ marginTop: "20px" }}>
-          {RATING_ORDER.filter(r => grouped[r]).map(r => (
-            <div key={r} style={{ marginBottom: "24px" }}>
-              <div style={{
-                fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700",
-                color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em",
-                marginBottom: "12px", borderBottom: `1.5px dashed ${C.border}`, paddingBottom: "6px",
-              }}>{RATING_LABELS[r]}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {grouped[r].map((w, i) => (
-                  <div key={i} style={{
-                    background: C.paper, border: `2px solid ${C.border}`, borderRadius: "12px",
-                    padding: "14px 16px", boxShadow: "2px 2px 0px rgba(0,0,0,0.04)",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div>
-                        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "18px", fontWeight: "700", color: C.text }}>{w.name}</div>
-                        {w.grape && <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", color: C.muted }}>{w.grape}</div>}
-                      </div>
-                      <div style={{ fontFamily: "'Caveat', cursive", fontSize: "11px", color: C.muted, textAlign: "right", flexShrink: 0, marginLeft: "10px" }}>
-                        {new Date(w.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        <br />
-                        <span style={{ fontSize: "10px", color: C.muted, opacity: 0.7 }}>{w.mode === "menu" ? "from menu" : "no menu"}</span>
-                      </div>
-                    </div>
-                    {w.location && <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", color: C.mutedDark, marginTop: "6px" }}>📍 {w.location}</div>}
-                    {w.eating && <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", color: C.mutedDark, marginTop: "3px" }}>🍽 {w.eating}</div>}
-                    {w.notes && <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.textBody, marginTop: "6px", fontStyle: "italic", lineHeight: 1.5 }}>"{w.notes}"</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-          <button onClick={onClear} style={{
-            fontSize: "13px", color: C.muted, background: "none", border: "none",
-            cursor: "pointer", fontFamily: "'Caveat', cursive", fontWeight: "600",
-            marginTop: "8px",
-          }}>clear all saved wines</button>
-        </div>
-      )}
-    </div>
-  );
-}
+};
 
 function ClarificationCard({ clarification, onSubmit }) {
   const [answers, setAnswers] = useState({});
@@ -439,11 +250,28 @@ export default function WinePicker() {
   const [result, setResult] = useState(null);
   const [clarification, setClarification] = useState(null);
   const [noMatch, setNoMatch] = useState(null);
-  const [ratingWine, setRatingWine] = useState(null);
-  const [saved, setSaved] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("pmag_saved") || "[]"); } catch { return []; }
-  });
   const fileRef = useRef();
+
+  // Cellar
+  const [cellarEntries, setCellarEntries] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pmag_cellar") || "[]"); } catch { return []; }
+  });
+  const [cellarOpen, setCellarOpen] = useState(false);
+
+  const savedNames = new Set(cellarEntries.map(e => e.name));
+
+  const handleSaveWine = (wine) => {
+    if (savedNames.has(wine.name)) return;
+    const updated = [...cellarEntries, { ...wine, savedAt: new Date().toISOString() }];
+    setCellarEntries(updated);
+    try { localStorage.setItem("pmag_cellar", JSON.stringify(updated)); } catch {}
+  };
+
+  const handleDeleteEntry = (name) => {
+    const updated = cellarEntries.filter(e => e.name !== name);
+    setCellarEntries(updated);
+    try { localStorage.setItem("pmag_cellar", JSON.stringify(updated)); } catch {}
+  };
 
   const handleImage = (e) => {
     const file = e.target.files[0];
@@ -605,26 +433,12 @@ No markdown, no extra text.`;
     setFood(""); setExtras([]); setExtrasText(""); setWinesILove("");
   };
 
-  const handleSaveWine = (wine) => setRatingWine(wine);
-
-  const handleRatingSave = (ratingData) => {
-    const entry = {
-      ...ratingWine,
-      ...ratingData,
-      savedAt: Date.now(),
-      mode: imageBase64 ? "menu" : "no-menu",
-    };
-    const updated = [entry, ...saved];
-    setSaved(updated);
-    localStorage.setItem("pmag_saved", JSON.stringify(updated));
-    setRatingWine(null);
-  };
-
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Lora', serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
       <style>{`
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
         input::placeholder { color: #b8a888; }
         * { box-sizing: border-box; }
       `}</style>
@@ -632,14 +446,27 @@ No markdown, no extra text.`;
       {/* Header */}
       <div style={{
         borderBottom: `3px solid ${C.blue}`, borderTop: `3px solid ${C.red}`,
-        background: C.paper, padding: "22px 24px 18px", textAlign: "center",
+        background: C.paper, padding: "22px 24px 18px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "42px", fontWeight: "700", color: C.red, lineHeight: 1 }}>
-          pour me a glass
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div style={{ fontFamily: "'Caveat', cursive", fontSize: "42px", fontWeight: "700", color: C.red, lineHeight: 1 }}>
+            pour me a glass
+          </div>
+          <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, marginTop: "4px", fontStyle: "italic" }}>
+            snap a wine list · get your picks
+          </div>
         </div>
-        <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, marginTop: "4px", fontStyle: "italic" }}>
-          snap a wine list · get your picks
-        </div>
+        <button onClick={() => setCellarOpen(true)} style={{
+          display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
+          background: "none", border: "none", cursor: "pointer", padding: "4px 6px",
+          flexShrink: 0, marginLeft: "8px",
+        }}>
+          <WineGlassIcon size={24} color={C.blue} filled={cellarEntries.length > 0} />
+          <span style={{ fontFamily: "'Caveat', cursive", fontSize: "11px", color: C.blue, fontWeight: "700", letterSpacing: "0.04em" }}>
+            {cellarEntries.length > 0 ? `cellar (${cellarEntries.length})` : "my cellar"}
+          </span>
+        </button>
       </div>
 
       <div style={{ maxWidth: "520px", margin: "0 auto", padding: "28px 20px 56px" }}>
@@ -823,13 +650,7 @@ No markdown, no extra text.`;
               color: C.blue, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px",
             }}>your picks</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {result.map((wine, i) => (
-                <WineCard
-                  key={i} wine={wine} index={i}
-                  onSave={handleSaveWine}
-                  isSaved={saved.some(s => s.name === wine.name)}
-                />
-              ))}
+              {result.map((wine, i) => <WineCard key={i} wine={wine} index={i} onSave={handleSaveWine} isSaved={savedNames.has(wine.name)} />)}
             </div>
             <div style={{ textAlign: "center", marginTop: "22px" }}>
               <button onClick={reset} style={{
@@ -839,28 +660,77 @@ No markdown, no extra text.`;
             </div>
           </div>
         )}
-
-        {/* Saved wines */}
-        <SavedWines
-          saved={saved}
-          onClear={() => { setSaved([]); localStorage.removeItem("pmag_saved"); }}
-        />
       </div>
-
-      {/* Rating modal */}
-      {ratingWine && (
-        <RatingModal
-          wine={ratingWine}
-          mode={imageBase64 ? "menu" : "no-menu"}
-          onSave={handleRatingSave}
-          onClose={() => setRatingWine(null)}
-        />
-      )}
 
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0, height: "4px",
         background: `linear-gradient(to right, ${C.red} 50%, ${C.blue} 50%)`,
       }} />
+
+      {/* Cellar drawer */}
+      {cellarOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", justifyContent: "flex-end" }}>
+          <div onClick={() => setCellarOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(26,18,8,0.5)" }} />
+          <div style={{
+            position: "relative", width: "min(400px, 100vw)", height: "100%",
+            background: C.bg, overflowY: "auto",
+            borderLeft: `3px solid ${C.blue}`,
+            display: "flex", flexDirection: "column",
+            animation: "slideInRight 0.3s ease both",
+          }}>
+            <div style={{
+              borderBottom: `2px solid ${C.border}`, padding: "22px 22px 16px",
+              background: C.paper, position: "sticky", top: 0, zIndex: 10,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div>
+                <div style={{ fontFamily: "'Caveat', cursive", fontSize: "26px", fontWeight: "700", color: C.red }}>my cellar</div>
+                <div style={{ fontFamily: "'Lora', serif", fontSize: "12px", color: C.muted, fontStyle: "italic" }}>
+                  {cellarEntries.length} {cellarEntries.length === 1 ? "wine saved" : "wines saved"}
+                </div>
+              </div>
+              <button onClick={() => setCellarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: C.muted }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            <div style={{ padding: "18px 18px 40px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              {cellarEntries.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: C.muted }}>
+                  <WineGlassIcon size={36} color={C.muted} />
+                  <div style={{ fontFamily: "'Caveat', cursive", fontSize: "18px", marginTop: "14px", fontWeight: "600" }}>nothing saved yet</div>
+                  <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", marginTop: "6px", fontStyle: "italic" }}>tap the glass icon on any pick to save it</div>
+                </div>
+              ) : (
+                cellarEntries.slice().reverse().map((wine, i) => (
+                  <div key={wine.name} style={{
+                    background: C.paper, border: `2px solid ${C.border}`, borderRadius: "12px",
+                    padding: "14px 16px", boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                      <div style={{ flex: 1, paddingRight: "8px" }}>
+                        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "18px", fontWeight: "700", color: C.text }}>{wine.name}</div>
+                        {wine.grape && <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", color: C.muted }}>{wine.grape}</div>}
+                        <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.textBody, lineHeight: 1.5, marginTop: "6px" }}>{wine.reason}</div>
+                        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "11px", color: C.muted, marginTop: "8px" }}>
+                          {new Date(wine.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteEntry(wine.name)} style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.35, padding: "2px", flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
