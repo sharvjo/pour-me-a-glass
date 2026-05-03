@@ -209,7 +209,8 @@ export default function WinePicker() {
   const [image, setImage] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
   const [imageMime, setImageMime] = useState("image/jpeg");
-  const [wineType, setWineType] = useState("");
+  const [wineTypes, setWineTypes] = useState([]);
+  const toggleWineType = (t) => setWineTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   const [desc1, setDesc1] = useState("");
   const [desc2, setDesc2] = useState("");
   const [desc3, setDesc3] = useState("");
@@ -255,11 +256,11 @@ export default function WinePicker() {
     prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]
   );
 
-  const hasEnough = wineType || desc1 || desc2 || desc3 || food;
+  const hasEnough = wineTypes.length || desc1 || desc2 || desc3 || food;
 
   const buildFirstPassPrompt = () => {
     const parts = [];
-    if (wineType) parts.push(`Wine type: ${wineType}`);
+    if (wineTypes.length) parts.push(`Wine type: ${wineTypes.join(", ")}`);
     const descs = [desc1, desc2, desc3].filter(Boolean);
     if (descs.length) parts.push(`Descriptors: ${descs.join(", ")}`);
     if (dontWant) parts.push(`Dealbreakers (must avoid): ${dontWant}`);
@@ -380,7 +381,7 @@ No markdown, no extra text.`;
   const reset = () => {
     setResult(null); setClarification(null); setNoMatch(null);
     setImage(null); setImageBase64(null); setImageMime("image/jpeg");
-    setWineType(""); setDesc1(""); setDesc2(""); setDesc3(""); setDontWant("");
+    setWineType([]); setDesc1(""); setDesc2(""); setDesc3(""); setDontWant("");
     setFood(""); setExtras([]); setExtrasText(""); setWinesILove("");
   };
 
