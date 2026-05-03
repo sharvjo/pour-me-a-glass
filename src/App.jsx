@@ -11,6 +11,9 @@ const FOOD_SUGGESTIONS = [
   "chicken", "oysters", "cheese", "pork", "vegetarian", "seafood", "burgers", "nothing"
 ];
 const EXTRAS = ["on the cheaper side", "sustainable", "natural/low-intervention", "women-owned", "organic"];
+const DEALBREAKER_SUGGESTIONS = [
+  "tannins", "sparkling", "more than $100", "oaky", "sweet", "bitter", "orange wine", "rosé", "under $20", "too acidic", "heavy", "buttery"
+];
 
 const C = {
   bg: "#f0ebe0",
@@ -206,14 +209,14 @@ export default function WinePicker() {
   const [image, setImage] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
   const [imageMime, setImageMime] = useState("image/jpeg");
-  const [wineType, setWineType] = useState([]);
+  const [wineType, setWineType] = useState("");
   const [desc1, setDesc1] = useState("");
   const [desc2, setDesc2] = useState("");
   const [desc3, setDesc3] = useState("");
+  const [dontWant, setDontWant] = useState("");
   const [food, setFood] = useState("");
   const [extras, setExtras] = useState([]);
   const [extrasText, setExtrasText] = useState("");
-  const [lovesText, setLovesText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [clarification, setClarification] = useState(null);
@@ -251,16 +254,16 @@ export default function WinePicker() {
     prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]
   );
 
-  const hasEnough = wineType.length > 0 || desc1 || desc2 || desc3 || food || lovesText;
+  const hasEnough = wineType || desc1 || desc2 || desc3 || food;
 
   const buildFirstPassPrompt = () => {
     const parts = [];
-    if (wineType.length) parts.push(`Wine type: ${wineType.join(", ")}`);
+    if (wineType) parts.push(`Wine type: ${wineType}`);
     const descs = [desc1, desc2, desc3].filter(Boolean);
     if (descs.length) parts.push(`Descriptors: ${descs.join(", ")}`);
+    if (dontWant) parts.push(`Dealbreakers (must avoid): ${dontWant}`);
     if (food) parts.push(`Food: ${food}`);
     if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
-    if (lovesText) parts.push(`Wines I already love: ${lovesText}`);
 
     if (imageBase64) {
       return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. I have uploaded a photo of a by-the-glass wine list. My preferences: ${parts.join(". ")}
@@ -271,37 +274,31 @@ Return ONLY one of these JSON formats, no markdown:
 FORMAT A: {"status":"match","picks":[{"name":"wine name as on menu","grape":"grape/region","reason":"1-2 sentences, confident"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting on list"}]}
 FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questions":[{"key":"wineType","label":"How important is it that it is [wine type]?","options":[{"value":"must","label":"non-negotiable"},{"value":"prefer","label":"I would prefer it"},{"value":"flexible","label":"flexible"}]},{"key":"foodFirst","label":"[food-specific suggestion]?","options":[{"value":"yes","label":"yes, go for it"},{"value":"no","label":"stick to my criteria"}]}]}`;
     } else {
-      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list. Give me exactly 4 wine recommendations. My preferences: ${parts.join(". ")}
+      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list - give 4 wine recommendations at different levels. My preferences: ${parts.join(". ")}
 
-Food pairing is top priority.
+Food pairing is top priority. Each pick should name a specific wine by producer and name, not just a category.
 
-Each pick's "name" should be a wine STYLE, REGION, or TYPE (e.g. "Bordeaux Margaux", "Willamette Valley Pinot Noir", "Alsatian Riesling"). NOT a specific bottle.
-
-The "reason" should be 2-3 sentences with real personality. Lead with the vibe and characteristics -- what does it taste like, what mood is it, why did you pick it for this person. Then end with producers to look for. Think: "This is the wine you drink on a Tuesday when you want to feel fancy without trying. Bright citrus, wet stone, and a finish that sticks around. Look for Domaine Vacheron, Pascal Jolivet, or Lucien Crochet."
-
-YOU MUST RETURN EXACTLY 4 PICKS with these tiers in this order:
-1. tier "easy_find" - a style/region that is widely available and approachable
-2. tier "famous" - a well-known quality style/region with respected producers
-3. tier "famous" - another well-known style/region, different from #2
-4. tier "sommelier" - a less obvious style/region a wine bar person would suggest
-
-CRITICAL: Return exactly 4 objects. Each MUST have a "tier" field.
+The 4 picks must be:
+1. "easy_find" - one widely available, recognizable producer anyone can find at a wine shop (the crowd-pleaser)
+2. "famous" - a well-known quality producer, the kind of name that shows up on good restaurant lists
+3. "famous" - another well-known quality producer, different style or region from #2
+4. "sommelier" - a smaller, more interesting producer that a wine bar person would recommend, the kind of bottle that starts a conversation
 
 Return ONLY this JSON, no markdown:
-{"status":"match","picks":[{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"easy_find"},{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"famous"},{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"famous"},{"name":"Wine Style/Region","grape":"grape variety","reason":"2-3 sentences: vibe, characteristics, why you picked it, then producers to look for","tier":"sommelier"}]}`;
+{"status":"match","picks":[{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"easy_find"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"famous"},{"name":"Producer, Wine Name","grape":"grape/region","reason":"1-2 sentences","tier":"sommelier"}]}`;
     }
   };
 
-    const buildSecondPassPrompt = (clarificationAnswers) => {
+  const buildSecondPassPrompt = (clarificationAnswers) => {
     const parts = [];
     if (wineType) parts.push(`Original wine type request: ${wineType} (importance: ${clarificationAnswers.wineType || "flexible"})`);
     const descs = [desc1, desc2, desc3].filter(Boolean);
     if (descs.length) parts.push(`Style descriptors: ${descs.join(", ")}`);
+    if (dontWant) parts.push(`Dealbreakers (must avoid these no matter what): ${dontWant}`);
     if (food) parts.push(`Food: ${food}`);
     if (clarificationAnswers.foodFirst === "yes") parts.push("User is open to wine type that pairs best with the food even if it differs from original request");
     if (clarificationAnswers.wineType === "must") parts.push(`User insists on ${wineType} — prioritize this even if food pairing is imperfect`);
     if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
-    if (lovesText) parts.push(`Wines I already love: ${lovesText}`);
 
     return `You are a knowledgeable sommelier who works at a great wine bar. Concise, confident, dry wit.
 
@@ -333,7 +330,7 @@ No markdown, no extra text.`;
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
+      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
     });
     const data = await res.json();
     const text = data.content?.map(b => b.text || "").join("") || "";
@@ -380,8 +377,8 @@ No markdown, no extra text.`;
   const reset = () => {
     setResult(null); setClarification(null); setNoMatch(null);
     setImage(null); setImageBase64(null); setImageMime("image/jpeg");
-    setWineType([]); setDesc1(""); setDesc2(""); setDesc3("");
-    setFood(""); setExtras([]); setExtrasText(""); setLovesText("");
+    setWineType(""); setDesc1(""); setDesc2(""); setDesc3(""); setDontWant("");
+    setFood(""); setExtras([]); setExtrasText("");
   };
 
   return (
@@ -438,33 +435,30 @@ No markdown, no extra text.`;
         <div style={{
           background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
           padding: "24px 22px 20px", marginBottom: "16px",
-          lineHeight: "2.8", fontSize: "19px", color: C.mutedDark,
+          fontSize: "19px", color: C.mutedDark,
           fontFamily: "'Caveat', cursive", fontWeight: "500",
           boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
         }}>
-          {"I want a "}
-          <span style={{ display: "inline" }}>
-            {WINE_TYPES.filter(t => t !== "Surprise me").map(t => {
-              const sel = wineType.includes(t);
-              return <button key={t} onClick={() => setWineType(prev => sel ? prev.filter(x => x !== t) : [...prev, t])} style={{
-                padding: "2px 10px", borderRadius: "16px", marginRight: "4px", marginBottom: "4px",
-                border: `2px solid ${sel ? C.red : C.chipBorder}`,
-                background: sel ? "rgba(200,35,44,0.08)" : "transparent",
-                color: sel ? C.red : C.muted,
-                fontSize: "15px", fontFamily: "'Caveat', cursive", fontWeight: sel ? "700" : "500",
-                cursor: "pointer", transition: "all 0.15s", display: "inline-block",
-              }}>{t}</button>;
-            })}
-          </span>
-          {" wine that is "}
-          <BlankInput value={desc1} onChange={setDesc1} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
-          {", "}
-          <BlankInput value={desc2} onChange={setDesc2} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
-          {", "}
-          <BlankInput value={desc3} onChange={setDesc3} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
-          {". I am eating "}
-          <BlankInput value={food} onChange={setFood} placeholder="___" suggestions={FOOD_SUGGESTIONS} width="130px" />
-          {"."}
+          {/* Line 1 */}
+          <div style={{ lineHeight: "2.8" }}>
+            {"I want a "}
+            <BlankInput value={wineType} onChange={setWineType} placeholder="type" suggestions={WINE_TYPES} width="95px" />
+            {" wine that is "}
+            <BlankInput value={desc1} onChange={setDesc1} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
+            {", "}
+            <BlankInput value={desc2} onChange={setDesc2} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
+            {", "}
+            <BlankInput value={desc3} onChange={setDesc3} placeholder="___" suggestions={DESCRIPTOR_SUGGESTIONS} width="80px" />
+            {" and I don't want "}
+            <BlankInput value={dontWant} onChange={setDontWant} placeholder="___" suggestions={DEALBREAKER_SUGGESTIONS} width="110px" />
+            {"."}
+          </div>
+          {/* Line 2 */}
+          <div style={{ lineHeight: "2.8", borderTop: `1.5px dashed ${C.border}`, marginTop: "6px", paddingTop: "4px" }}>
+            {"I am eating "}
+            <BlankInput value={food} onChange={setFood} placeholder="___" suggestions={FOOD_SUGGESTIONS} width="130px" />
+            {"."}
+          </div>
         </div>
 
         {/* Extras */}
@@ -502,12 +496,6 @@ No markdown, no extra text.`;
               fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "9px 14px", outline: "none",
             }}
           />
-        </div>
-
-        {/* Wines I Love */}
-        <div style={{ background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px", padding: "18px 20px", marginBottom: "22px", boxShadow: "2px 2px 0px rgba(0,0,0,0.05)" }}>
-          <div style={{ fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700", color: C.blue, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px" }}>wines I already love</div>
-          <input value={lovesText} onChange={e => setLovesText(e.target.value)} placeholder="Sancerre, anything from Jura, Pierre Frick Riesling..." style={{ width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`, borderRadius: "10px", color: C.text, fontSize: "14px", fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "9px 14px", outline: "none" }} />
         </div>
 
         {/* Submit */}
