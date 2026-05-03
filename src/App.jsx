@@ -333,7 +333,7 @@ No markdown, no extra text.`;
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
+      body: JSON.stringify({ model: "claude-haiku-4-5", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
     });
     const data = await res.json();
     const text = data.content?.map(b => b.text || "").join("") || "";
