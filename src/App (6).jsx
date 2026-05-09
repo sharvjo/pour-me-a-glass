@@ -10,7 +10,6 @@ const FOOD_SUGGESTIONS = [
   "tacos", "birria tacos", "steak", "salmon", "pasta", "sushi", "pizza", "lamb",
   "chicken", "oysters", "cheese", "pork", "vegetarian", "seafood", "burgers", "nothing"
 ];
-const EXTRAS = ["on the cheaper side", "sustainable", "natural/low-intervention", "women-owned", "organic"];
 const DEALBREAKER_SUGGESTIONS = [
   "tannins", "sparkling", "more than $100", "oaky", "sweet", "bitter", "orange wine", "rosé", "under $20", "too acidic", "heavy", "buttery"
 ];
@@ -134,6 +133,48 @@ const CellarDoorIcon = ({ size = 22, color = "#5a321a" }) => (
   </svg>
 );
 
+// ─── Rating Icons ─────────────────────────────────────────────────────────────
+
+const CrossOutIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22 22 Q50 48 78 78" stroke={color} strokeWidth="11" strokeLinecap="round" fill="none"/>
+    <path d="M78 22 Q50 52 22 78" stroke={color} strokeWidth="11" strokeLinecap="round" fill="none"/>
+  </svg>
+);
+
+const HeartIcon = ({ size = 18, color = "currentColor", filled = false }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M50 86 C 18 66, 4 42, 20 22 C 32 10, 46 16, 50 30 C 54 16, 68 10, 80 22 C 96 42, 82 66, 50 86 Z"
+      stroke={color} strokeWidth="7"
+      fill={filled ? color : "none"}
+      strokeLinejoin="round" strokeLinecap="round"/>
+  </svg>
+);
+
+const DoubleHeartIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M50 90 C 16 68, 2 42, 18 20 C 32 8, 46 14, 50 28 C 54 14, 68 8, 82 20 C 98 42, 84 68, 50 90 Z"
+      stroke={color} strokeWidth="6"
+      fill="none"
+      strokeLinejoin="round" strokeLinecap="round"/>
+    <path
+      d="M50 76 C 28 60, 18 44, 28 28 C 36 20, 46 24, 50 34 C 54 24, 64 20, 72 28 C 82 44, 72 60, 50 76 Z"
+      stroke={color} strokeWidth="5"
+      fill="none"
+      strokeLinejoin="round" strokeLinecap="round"/>
+  </svg>
+);
+
+const RATING_COLORS = {
+  dislike: "#1a1208",
+  like: "#fac2bf",
+  love: "#8a101e",
+};
+
+const RATING_RANK = { love: 3, like: 2, dislike: 0 };
+
 // ─── Wine Type Color ──────────────────────────────────────────────────────────
 
 const WINE_COLORS = {
@@ -183,7 +224,7 @@ const TIER_CONFIG = {
 const MENU_LABELS = ["pick #1", "pick #2", "✦ wildcard"];
 const MENU_COLORS = ["#c8232c", "#1a2b5e", "#c8232c"];
 
-const WineCard = ({ wine, index, onSave, isSaved, selectedTypes }) => {
+const WineCard = ({ wine, index, onSave, isSaved, selectedTypes, rating, onRate }) => {
   const tier = wine.tier && TIER_CONFIG[wine.tier];
   const isMenuWildcard = !tier && index === 2;
   const isSommelier = tier && wine.tier === "sommelier";
@@ -199,23 +240,71 @@ const WineCard = ({ wine, index, onSave, isSaved, selectedTypes }) => {
   const glassColor = isSaved ? wineColor : unsavedColor;
   const saveKey = wine.style || wine.name;
 
-  return (
-    <div style={{ position: "relative", background: cardBg, border: `2px solid ${cardBorder}`, borderRadius: "12px", padding: "18px 20px", boxShadow: isDark ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)", animation: `fadeUp 0.35s ease ${index * 0.1}s both` }}>
-      <button
-        onClick={() => onSave({ ...wine, name: saveKey })}
-        title={isSaved ? "tap to remove from the cellar" : "save to the cellar"}
-        style={{
-          position: "absolute", top: "12px", left: "14px",
-          background: "none", border: "none", cursor: "pointer",
-          padding: "2px", opacity: isSaved ? 1 : 0.55,
-          transition: "opacity 0.2s, transform 0.15s",
-          transform: isSaved ? "scale(1.15)" : "scale(1)",
-        }}
-      >
-        <WineGlassIcon size={20} color={glassColor} filled={isSaved} />
-      </button>
+  const ratingGrey = isDark ? "rgba(255,255,255,0.45)" : "#73787C";
+  const dislikeActive = isDark ? "#ffffff" : RATING_COLORS.dislike;
 
-      <div style={{ paddingLeft: "26px" }}>
+  const ratingButtonStyle = (active) => ({
+    background: "none", border: "none", cursor: "pointer", padding: "3px",
+    opacity: active ? 1 : 0.6,
+    transform: active ? "scale(1.15)" : "scale(1)",
+    transition: "opacity 0.2s, transform 0.15s",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  });
+
+  const captionColor = isDark ? "rgba(255,255,255,0.6)" : "#73787C";
+  const captionStyle = {
+    fontFamily: "'Caveat', cursive", fontSize: "11px", fontWeight: "700",
+    letterSpacing: "0.05em", color: captionColor, lineHeight: 1,
+  };
+
+  return (
+    <div style={{ background: cardBg, border: `2px solid ${cardBorder}`, borderRadius: "12px", padding: "14px 18px 18px", boxShadow: isDark ? "4px 4px 0px rgba(26,43,94,0.25)" : "2px 2px 0px rgba(0,0,0,0.06)", animation: `fadeUp 0.35s ease ${index * 0.1}s both` }}>
+      {/* Header row: save (left) + rate this (right) */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+        <button
+          onClick={() => onSave({ ...wine, name: saveKey })}
+          title={isSaved ? "tap to remove from the cellar" : "save to the cellar"}
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
+            background: "none", border: "none", cursor: "pointer", padding: "2px 4px",
+            opacity: isSaved ? 1 : 0.7,
+            transition: "opacity 0.2s, transform 0.15s",
+            transform: isSaved ? "scale(1.05)" : "scale(1)",
+          }}
+        >
+          <WineGlassIcon size={22} color={glassColor} filled={isSaved} />
+          <span style={{ ...captionStyle, color: isSaved ? wineColor : captionColor }}>save</span>
+        </button>
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <button
+              onClick={() => onRate(saveKey, "dislike")}
+              title={rating === "dislike" ? "tap to clear" : "didn't like"}
+              style={ratingButtonStyle(rating === "dislike")}
+            >
+              <CrossOutIcon size={18} color={rating === "dislike" ? dislikeActive : ratingGrey} />
+            </button>
+            <button
+              onClick={() => onRate(saveKey, "like")}
+              title={rating === "like" ? "tap to clear" : "liked"}
+              style={ratingButtonStyle(rating === "like")}
+            >
+              <HeartIcon size={18} color={rating === "like" ? RATING_COLORS.like : ratingGrey} filled={rating === "like"} />
+            </button>
+            <button
+              onClick={() => onRate(saveKey, "love")}
+              title={rating === "love" ? "tap to clear" : "loved"}
+              style={ratingButtonStyle(rating === "love")}
+            >
+              <DoubleHeartIcon size={18} color={rating === "love" ? RATING_COLORS.love : ratingGrey} />
+            </button>
+          </div>
+          <span style={captionStyle}>rate this</span>
+        </div>
+      </div>
+
+      <div>
         <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700", color: isDark ? "rgba(255,255,255,0.7)" : labelColor, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>{label}</div>
 
         {isStyleCard ? (
@@ -320,8 +409,6 @@ export default function WinePicker() {
   const [desc3, setDesc3] = useState("");
   const [dontWant, setDontWant] = useState("");
   const [food, setFood] = useState("");
-  const [extras, setExtras] = useState([]);
-  const [extrasText, setExtrasText] = useState("");
   const [winesILove, setWinesILove] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -334,26 +421,92 @@ export default function WinePicker() {
     try { return JSON.parse(localStorage.getItem("pmag_cellar") || "[]"); } catch { return []; }
   });
   const [cellarOpen, setCellarOpen] = useState(false);
+  // Track which saved wines are currently expanded in the drawer
+  const [expandedSaves, setExpandedSaves] = useState({});
+  const toggleExpanded = (key) => {
+    setExpandedSaves(prev => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      else next[key] = true;
+      return next;
+    });
+  };
+
+  // Ratings (persist independently of saving — every tap is remembered)
+  const [wineRatings, setWineRatings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pmag_ratings") || "{}"); } catch { return {}; }
+  });
+
+  // Free-form notes the user adds when rating a wine (fed back into prompts)
+  const [wineNotes, setWineNotes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pmag_notes") || "{}"); } catch { return {}; }
+  });
+
+  // Modal: prompt for "where + what are you eating" before adding to cellar
+  const [savePrompt, setSavePrompt] = useState(null); // { wine, location, food } | null
+  // Modal: prompt for thoughts after a rating is set
+  const [notesPrompt, setNotesPrompt] = useState(null); // { wineKey, rating, draft } | null
 
   const savedNames = new Set(cellarEntries.map(e => e.name));
 
+  // Tap on the save glass: if already saved, remove silently. If not, open modal.
   const handleSaveWine = (wine) => {
     if (savedNames.has(wine.name)) {
-      // toggle off — remove from cellar
       const updated = cellarEntries.filter(e => e.name !== wine.name);
       setCellarEntries(updated);
       try { localStorage.setItem("pmag_cellar", JSON.stringify(updated)); } catch {}
       return;
     }
-    const updated = [...cellarEntries, { ...wine, savedAt: new Date().toISOString() }];
-    setCellarEntries(updated);
-    try { localStorage.setItem("pmag_cellar", JSON.stringify(updated)); } catch {}
+    // Pre-fill food field with whatever they currently have in the mad libs (if anything)
+    setSavePrompt({ wine, location: "", food: food || "" });
   };
 
-  const handleDeleteEntry = (name) => {
-    const updated = cellarEntries.filter(e => e.name !== name);
+  // Called from the save modal when the user confirms
+  const confirmSave = () => {
+    if (!savePrompt) return;
+    const { wine, location, food: ctxFood } = savePrompt;
+    const savedContext = (location || ctxFood)
+      ? { location: location.trim(), food: ctxFood.trim() }
+      : null;
+    const entry = { ...wine, savedAt: new Date().toISOString() };
+    if (savedContext) entry.savedContext = savedContext;
+    const updated = [...cellarEntries, entry];
     setCellarEntries(updated);
     try { localStorage.setItem("pmag_cellar", JSON.stringify(updated)); } catch {}
+    setSavePrompt(null);
+  };
+
+  // Tap on a rating: store it. If the rating became non-null, open notes modal.
+  const handleRate = (wineKey, newRating) => {
+    const updated = { ...wineRatings };
+    let becameActive = false;
+    if (updated[wineKey] === newRating) {
+      delete updated[wineKey]; // toggle off
+    } else {
+      updated[wineKey] = newRating;
+      becameActive = true;
+    }
+    setWineRatings(updated);
+    try { localStorage.setItem("pmag_ratings", JSON.stringify(updated)); } catch {}
+    if (becameActive) {
+      setNotesPrompt({ wineKey, rating: newRating, draft: wineNotes[wineKey] || "" });
+    }
+  };
+
+  // Called from the notes modal
+  const confirmNote = () => {
+    if (!notesPrompt) return;
+    const { wineKey, draft } = notesPrompt;
+    const trimmed = draft.trim();
+    const updated = { ...wineNotes };
+    if (trimmed) {
+      updated[wineKey] = trimmed;
+    } else {
+      delete updated[wineKey];
+    }
+    setWineNotes(updated);
+    try { localStorage.setItem("pmag_notes", JSON.stringify(updated)); } catch {}
+    setNotesPrompt(null);
   };
 
   const handleImage = (e) => {
@@ -383,11 +536,41 @@ export default function WinePicker() {
     }
   };
 
-  const toggleExtra = (e) => setExtras(prev =>
-    prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]
-  );
-
   const hasEnough = wineTypes.length || desc1 || desc2 || desc3 || food;
+
+  // Summarize past ratings for the model so it learns from the user's taste over time
+  const buildRatingContext = () => {
+    const entries = Object.entries(wineRatings);
+    if (!entries.length) return "";
+    const fmt = (k) => {
+      const note = wineNotes[k];
+      return note ? `${k} — note: "${note}"` : k;
+    };
+    const loved = entries.filter(([, r]) => r === "love").map(([k]) => fmt(k)).slice(0, 12);
+    const liked = entries.filter(([, r]) => r === "like").map(([k]) => fmt(k)).slice(0, 12);
+    const disliked = entries.filter(([, r]) => r === "dislike").map(([k]) => fmt(k)).slice(0, 12);
+    const out = [];
+    if (loved.length) out.push(`Wines/styles they LOVED previously (lean strongly toward this profile, take notes seriously): ${loved.join("; ")}`);
+    if (liked.length) out.push(`Wines/styles they LIKED previously (good calibration signal, notes give nuance): ${liked.join("; ")}`);
+    if (disliked.length) out.push(`Wines/styles they DID NOT like (avoid this profile; notes explain why): ${disliked.join("; ")}`);
+    return out.join(". ");
+  };
+
+  // Saved-with-context history: where they were, what they were eating
+  const buildSaveContext = () => {
+    const withCtx = cellarEntries
+      .filter(e => e.savedContext && (e.savedContext.location || e.savedContext.food))
+      .slice(-10);
+    if (!withCtx.length) return "";
+    const lines = withCtx.map(e => {
+      const c = e.savedContext;
+      const parts = [];
+      if (c.food) parts.push(`with ${c.food}`);
+      if (c.location) parts.push(`at ${c.location}`);
+      return `${e.name} (${parts.join(", ")})`;
+    });
+    return `Wines they saved alongside specific food/places (use to spot pairing patterns): ${lines.join("; ")}`;
+  };
 
   const buildFirstPassPrompt = () => {
     const parts = [];
@@ -396,8 +579,11 @@ export default function WinePicker() {
     if (descs.length) parts.push(`Descriptors: ${descs.join(", ")}`);
     if (dontWant) parts.push(`Dealbreakers (must avoid): ${dontWant}`);
     if (food) parts.push(`Food: ${food}`);
-    if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
     if (winesILove) parts.push(`Wines they already love (use to calibrate style): ${winesILove}`);
+    const ratingCtx = buildRatingContext();
+    if (ratingCtx) parts.push(ratingCtx);
+    const saveCtx = buildSaveContext();
+    if (saveCtx) parts.push(saveCtx);
 
     if (imageBase64) {
       return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. I have uploaded a photo of a by-the-glass wine list. My preferences: ${parts.join(". ")}
@@ -408,7 +594,7 @@ Return ONLY one of these JSON formats, no markdown:
 FORMAT A: {"status":"match","picks":[{"name":"wine name as on menu","grape":"grape/region","reason":"1-2 sentences, confident"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting on list"}]}
 FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questions":[{"key":"wineType","label":"How important is it that it is [wine type]?","options":[{"value":"must","label":"non-negotiable"},{"value":"prefer","label":"I would prefer it"},{"value":"flexible","label":"flexible"}]},{"key":"foodFirst","label":"[food-specific suggestion]?","options":[{"value":"yes","label":"yes, go for it"},{"value":"no","label":"stick to my criteria"}]}]}`;
     } else {
-      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list — give 3 specific style-based recommendations tailored tightly to what the person asked for. My preferences: ${parts.join(". ")}
+      return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list — give exactly 4 specific style-based recommendations tailored tightly to what the person asked for. My preferences: ${parts.join(". ")}
 
 Food pairing is top priority. 
 
@@ -418,13 +604,16 @@ Style naming rules — this is critical:
 - The region field handles the grape and place: "Chardonnay, Burgundy, France" or "Tempranillo, Castilla y León, Spain"
 - The description must directly reference the person's preferences and food — specific, not generic
 
-The 3 picks must be:
+The 4 picks must be:
 1. tier "easy_find" — approachable, crowd-pleasing, widely available style that fits their ask precisely
-2. tier "famous" — a well-known classic on good restaurant lists, specific to their preferences  
-3. tier "sommelier" — something more interesting or unexpected, still fits their ask
+2. tier "famous" — a well-known classic on good restaurant lists, specific to their preferences
+3. tier "famous" — a DIFFERENT well-known classic, distinct in region or grape from #2 but still fitting the ask (must not duplicate #2's style)
+4. tier "sommelier" — something more interesting or unexpected, still fits their ask
+
+CRITICAL: Return EXACTLY 4 picks. Each MUST have a "tier" field. Picks #2 and #3 must be meaningfully different from each other.
 
 Return ONLY this JSON, no markdown:
-{"status":"match","picks":[{"style":"Chablis Premier Cru","region":"Chardonnay, Burgundy, France","description":"2 sentences directly referencing their preferences and food","tier":"easy_find","producers":["Producer 1","Producer 2","Producer 3","Producer 4"]},{"style":"...","region":"...","description":"...","tier":"famous","producers":["...","...","...","..."]},{"style":"...","region":"...","description":"...","tier":"sommelier","producers":["...","...","...","..."]}]}`;
+{"status":"match","picks":[{"style":"Chablis Premier Cru","region":"Chardonnay, Burgundy, France","description":"2 sentences directly referencing their preferences and food","tier":"easy_find","producers":["Producer 1","Producer 2","Producer 3","Producer 4"]},{"style":"...","region":"...","description":"...","tier":"famous","producers":["...","...","...","..."]},{"style":"...","region":"...","description":"...","tier":"famous","producers":["...","...","...","..."]},{"style":"...","region":"...","description":"...","tier":"sommelier","producers":["...","...","...","..."]}]}`;
     }
   };
 
@@ -437,8 +626,11 @@ Return ONLY this JSON, no markdown:
     if (food) parts.push(`Food: ${food}`);
     if (clarificationAnswers.foodFirst === "yes") parts.push("User is open to wine type that pairs best with the food even if it differs from original request");
     if (clarificationAnswers.wineType === "must") parts.push(`User insists on ${wineType} — prioritize this even if food pairing is imperfect`);
-    if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
     if (winesILove) parts.push(`Wines they already love (use to calibrate style): ${winesILove}`);
+    const ratingCtx = buildRatingContext();
+    if (ratingCtx) parts.push(ratingCtx);
+    const saveCtx = buildSaveContext();
+    if (saveCtx) parts.push(saveCtx);
 
     return `You are a knowledgeable sommelier who works at a great wine bar. Concise, confident, dry wit.
 
@@ -470,7 +662,7 @@ No markdown, no extra text.`;
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-haiku-4-5", max_tokens: 1000, messages: [{ role: "user", content: msgContent }] })
+      body: JSON.stringify({ model: "claude-haiku-4-5", max_tokens: 1500, messages: [{ role: "user", content: msgContent }] })
     });
     const data = await res.json();
     const text = data.content?.map(b => b.text || "").join("") || "";
@@ -629,43 +821,6 @@ No markdown, no extra text.`;
           </div>
         </div>
 
-        {/* Extras */}
-        <div style={{
-          background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
-          padding: "18px 20px", marginBottom: "16px",
-          boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
-        }}>
-          <div style={{
-            fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
-            color: C.blue, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px",
-          }}>other things I care about</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-            {EXTRAS.map(e => {
-              const sel = extras.includes(e);
-              return (
-                <button key={e} onClick={() => toggleExtra(e)} style={{
-                  padding: "6px 14px", borderRadius: "20px",
-                  border: `2px solid ${sel ? C.red : C.chipBorder}`,
-                  background: sel ? "rgba(200,35,44,0.08)" : C.chip,
-                  color: sel ? C.red : C.mutedDark,
-                  fontSize: "14px", fontFamily: "'Caveat', cursive",
-                  fontWeight: sel ? "700" : "500", cursor: "pointer", transition: "all 0.15s",
-                }}>{e}</button>
-              );
-            })}
-          </div>
-          <input
-            value={extrasText}
-            onChange={e => setExtrasText(e.target.value)}
-            placeholder="anything else... something from the Rhône, not too oaky..."
-            style={{
-              width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
-              borderRadius: "10px", color: C.text, fontSize: "14px",
-              fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "9px 14px", outline: "none",
-            }}
-          />
-        </div>
-
         {/* Wines I love */}
         <div style={{
           background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
@@ -738,7 +893,16 @@ No markdown, no extra text.`;
               color: C.blue, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px",
             }}>your picks</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {result.map((wine, i) => <WineCard key={i} wine={wine} index={i} onSave={handleSaveWine} isSaved={savedNames.has(wine.style || wine.name)} selectedTypes={wineTypes} />)}
+              {result.map((wine, i) => {
+                const key = wine.style || wine.name;
+                return <WineCard
+                  key={i} wine={wine} index={i}
+                  onSave={handleSaveWine} isSaved={savedNames.has(key)}
+                  selectedTypes={wineTypes}
+                  rating={wineRatings[key] || null}
+                  onRate={handleRate}
+                />;
+              })}
             </div>
             <div style={{ textAlign: "center", marginTop: "22px" }}>
               <button onClick={reset} style={{
@@ -754,6 +918,126 @@ No markdown, no extra text.`;
         position: "fixed", bottom: 0, left: 0, right: 0, height: "4px",
         background: `linear-gradient(to right, ${C.red} 50%, ${C.blue} 50%)`,
       }} />
+
+      {/* Save context modal — appears when saving a wine, asks for location + food */}
+      {savePrompt && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+          <div onClick={() => setSavePrompt(null)} style={{ position: "absolute", inset: 0, background: "rgba(26,18,8,0.55)" }} />
+          <div style={{
+            position: "relative", width: "min(440px, 100%)",
+            background: C.paper, border: `2px solid ${C.blue}`, borderRadius: "16px",
+            padding: "26px 24px 22px",
+            boxShadow: "4px 4px 0px rgba(26,43,94,0.2)",
+            animation: "fadeUp 0.25s ease both",
+          }}>
+            <div style={{ fontFamily: "'Caveat', cursive", fontSize: "26px", fontWeight: "700", color: C.red, lineHeight: 1.1 }}>
+              save to the cellar
+            </div>
+            <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, fontStyle: "italic", marginTop: "4px", marginBottom: "18px" }}>
+              {savePrompt.wine.style || savePrompt.wine.name}
+            </div>
+
+            <label style={{ fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700", color: C.text, letterSpacing: "0.04em", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>where are you?</label>
+            <input
+              autoFocus
+              value={savePrompt.location}
+              onChange={e => setSavePrompt({ ...savePrompt, location: e.target.value })}
+              placeholder="Lei, my kitchen, that wine bar in Williamsburg..."
+              style={{
+                width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+                borderRadius: "10px", color: C.text, fontSize: "15px",
+                fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "10px 14px", outline: "none",
+                marginBottom: "16px",
+              }}
+            />
+
+            <label style={{ fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700", color: C.text, letterSpacing: "0.04em", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>what are you eating?</label>
+            <input
+              value={savePrompt.food}
+              onChange={e => setSavePrompt({ ...savePrompt, food: e.target.value })}
+              placeholder="lamb chops, oysters, just the wine..."
+              style={{
+                width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+                borderRadius: "10px", color: C.text, fontSize: "15px",
+                fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "10px 14px", outline: "none",
+                marginBottom: "20px",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setSavePrompt(null)} style={{
+                flex: "0 0 auto", padding: "12px 18px",
+                background: "none", color: C.muted, border: `2px solid ${C.border}`,
+                borderRadius: "10px", fontSize: "15px",
+                fontFamily: "'Caveat', cursive", fontWeight: "600", cursor: "pointer",
+              }}>cancel</button>
+              <button onClick={confirmSave} style={{
+                flex: 1, padding: "12px",
+                background: C.red, color: "#fff", border: "none",
+                borderRadius: "10px", fontSize: "16px",
+                fontFamily: "'Caveat', cursive", fontWeight: "700", cursor: "pointer",
+                boxShadow: "2px 2px 0px rgba(200,35,44,0.25)",
+              }}>save it →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notes modal — appears after rating, asks for thoughts */}
+      {notesPrompt && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+          <div onClick={() => setNotesPrompt(null)} style={{ position: "absolute", inset: 0, background: "rgba(26,18,8,0.55)" }} />
+          <div style={{
+            position: "relative", width: "min(440px, 100%)",
+            background: C.paper, border: `2px solid ${notesPrompt.rating === "love" ? RATING_COLORS.love : (notesPrompt.rating === "like" ? "#d49aa0" : "#3a2e1e")}`,
+            borderRadius: "16px", padding: "26px 24px 22px",
+            boxShadow: "4px 4px 0px rgba(26,43,94,0.18)",
+            animation: "fadeUp 0.25s ease both",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+              {notesPrompt.rating === "love" && <DoubleHeartIcon size={22} color={RATING_COLORS.love} />}
+              {notesPrompt.rating === "like" && <HeartIcon size={22} color={RATING_COLORS.like} filled={true} />}
+              {notesPrompt.rating === "dislike" && <CrossOutIcon size={20} color={RATING_COLORS.dislike} />}
+              <div style={{ fontFamily: "'Caveat', cursive", fontSize: "26px", fontWeight: "700", color: C.red, lineHeight: 1.1 }}>
+                {notesPrompt.rating === "love" ? "what made you love it?" : notesPrompt.rating === "like" ? "what did you like?" : "what put you off?"}
+              </div>
+            </div>
+            <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, fontStyle: "italic", marginBottom: "16px" }}>
+              {notesPrompt.wineKey} · helps the algorithm learn your taste
+            </div>
+
+            <textarea
+              autoFocus
+              value={notesPrompt.draft}
+              onChange={e => setNotesPrompt({ ...notesPrompt, draft: e.target.value })}
+              placeholder="too tannic, paired great with the lamb, reminded me of that Mullineux..."
+              rows={4}
+              style={{
+                width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+                borderRadius: "10px", color: C.text, fontSize: "15px",
+                fontFamily: "'Lora', serif", fontWeight: "400", padding: "12px 14px", outline: "none",
+                marginBottom: "18px", resize: "vertical", lineHeight: 1.5,
+              }}
+            />
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setNotesPrompt(null)} style={{
+                flex: "0 0 auto", padding: "12px 18px",
+                background: "none", color: C.muted, border: `2px solid ${C.border}`,
+                borderRadius: "10px", fontSize: "15px",
+                fontFamily: "'Caveat', cursive", fontWeight: "600", cursor: "pointer",
+              }}>skip</button>
+              <button onClick={confirmNote} style={{
+                flex: 1, padding: "12px",
+                background: C.red, color: "#fff", border: "none",
+                borderRadius: "10px", fontSize: "16px",
+                fontFamily: "'Caveat', cursive", fontWeight: "700", cursor: "pointer",
+                boxShadow: "2px 2px 0px rgba(200,35,44,0.25)",
+              }}>save thoughts →</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cellar drawer */}
       {cellarOpen && (
@@ -792,28 +1076,104 @@ No markdown, no extra text.`;
                   <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", marginTop: "6px", fontStyle: "italic" }}>tap the glass icon on any pick to save it</div>
                 </div>
               ) : (
-                cellarEntries.slice().reverse().map((wine, i) => (
-                  <div key={wine.name} style={{
-                    background: C.paper, border: `2px solid ${C.border}`, borderRadius: "12px",
-                    padding: "14px 16px", boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                      <div style={{ flex: 1, paddingRight: "8px" }}>
-                        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "18px", fontWeight: "700", color: C.text }}>{wine.name}</div>
-                        {wine.grape && <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", color: C.muted }}>{wine.grape}</div>}
-                        <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.textBody, lineHeight: 1.5, marginTop: "6px" }}>{wine.reason}</div>
-                        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "11px", color: C.muted, marginTop: "8px" }}>
-                          {new Date(wine.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                cellarEntries.slice().sort((a, b) => {
+                  const rA = wineRatings[a.name];
+                  const rB = wineRatings[b.name];
+                  const rankA = rA ? RATING_RANK[rA] : 1;
+                  const rankB = rB ? RATING_RANK[rB] : 1;
+                  if (rankA !== rankB) return rankB - rankA; // higher rank first
+                  return new Date(b.savedAt) - new Date(a.savedAt); // newer first within tier
+                }).map((wine, i) => {
+                  const wineKey = wine.style || wine.name;
+                  const isExpanded = !!expandedSaves[wineKey];
+                  const tierColor = wine.tier && TIER_CONFIG[wine.tier] ? TIER_CONFIG[wine.tier].color : C.muted;
+                  const r = wineRatings[wineKey];
+                  const ctx = wine.savedContext;
+                  const dateStr = new Date(wine.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                  return (
+                    <div key={wineKey}>
+                      {/* Collapsed label row — always visible, click to toggle */}
+                      <button
+                        onClick={() => toggleExpanded(wineKey)}
+                        style={{
+                          width: "100%",
+                          background: C.paper,
+                          border: `2px solid ${C.border}`,
+                          borderLeft: `4px solid ${tierColor}`,
+                          borderRadius: "10px",
+                          padding: "12px 14px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "10px",
+                          opacity: r === "dislike" ? 0.7 : 1,
+                          boxShadow: isExpanded ? "none" : "2px 2px 0px rgba(0,0,0,0.05)",
+                          textAlign: "left",
+                        }}
+                      >
+                        <span style={{
+                          fontFamily: "'Caveat', cursive",
+                          fontSize: "19px",
+                          fontWeight: "700",
+                          color: C.text,
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>{wineKey}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                          {r === "love" && <DoubleHeartIcon size={16} color={RATING_COLORS.love} />}
+                          {r === "like" && <HeartIcon size={16} color={RATING_COLORS.like} filled={true} />}
+                          {r === "dislike" && <CrossOutIcon size={14} color={RATING_COLORS.dislike} />}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{
+                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                            transition: "transform 0.2s",
+                          }}>
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
                         </div>
-                      </div>
-                      <button onClick={() => handleDeleteEntry(wine.name)} style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.35, padding: "2px", flexShrink: 0 }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2.5" strokeLinecap="round">
-                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
                       </button>
+
+                      {/* Expanded: full WineCard + saved-with footer */}
+                      {isExpanded && (
+                        <div style={{ marginTop: "8px", animation: "fadeUp 0.2s ease both" }}>
+                          <WineCard
+                            wine={wine}
+                            index={i}
+                            onSave={handleSaveWine}
+                            isSaved={true}
+                            selectedTypes={[]}
+                            rating={r || null}
+                            onRate={handleRate}
+                          />
+                          <div style={{
+                            marginTop: "-2px", padding: "8px 14px 10px",
+                            fontFamily: "'Lora', serif", fontSize: "12px",
+                            color: C.muted, fontStyle: "italic", lineHeight: 1.4,
+                          }}>
+                            {ctx && (ctx.food || ctx.location) ? (
+                              <>
+                                saved {ctx.food && <>with <span style={{ color: C.textBody, fontStyle: "normal", fontWeight: 600 }}>{ctx.food}</span></>}
+                                {ctx.food && ctx.location && " "}
+                                {ctx.location && <>at <span style={{ color: C.textBody, fontStyle: "normal", fontWeight: 600 }}>{ctx.location}</span></>}
+                                {" · "}{dateStr}
+                              </>
+                            ) : (
+                              <>saved {dateStr}</>
+                            )}
+                            {wineNotes[wineKey] && (
+                              <div style={{ marginTop: "4px", color: C.textBody, fontStyle: "italic" }}>
+                                "{wineNotes[wineKey]}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
