@@ -10,7 +10,6 @@ const FOOD_SUGGESTIONS = [
   "tacos", "birria tacos", "steak", "salmon", "pasta", "sushi", "pizza", "lamb",
   "chicken", "oysters", "cheese", "pork", "vegetarian", "seafood", "burgers", "nothing"
 ];
-const EXTRAS = ["on the cheaper side", "sustainable", "natural/low-intervention", "women-owned", "organic"];
 const DEALBREAKER_SUGGESTIONS = [
   "tannins", "sparkling", "more than $100", "oaky", "sweet", "bitter", "orange wine", "rosé", "under $20", "too acidic", "heavy", "buttery"
 ];
@@ -175,6 +174,10 @@ const RATING_COLORS = {
 };
 
 const RATING_RANK = { love: 3, like: 2, dislike: 0 };
+
+// Cold-start threshold: history doesn't enter prompts until the user has at least this many ratings.
+// Until then, recommendations rely solely on the current ask (color/adjectives/food/dealbreakers).
+const RATING_THRESHOLD = 10;
 
 // ─── Wine Type Color ──────────────────────────────────────────────────────────
 
@@ -397,9 +400,134 @@ function ClarificationCard({ clarification, onSubmit }) {
   );
 }
 
+// ─── Lookup Card ──────────────────────────────────────────────────────────────
+
+const LookupCard = ({ wine, onSave, isSaved, rating, onRate }) => {
+  const wineColor = getWineTypeColor(wine, []);
+  const unsavedColor = "#73787C";
+  const glassColor = isSaved ? wineColor : unsavedColor;
+  const ratingGrey = "#73787C";
+
+  const ratingButtonStyle = (active) => ({
+    background: "none", border: "none", cursor: "pointer", padding: "3px",
+    opacity: active ? 1 : 0.6,
+    transform: active ? "scale(1.15)" : "scale(1)",
+    transition: "opacity 0.2s, transform 0.15s",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  });
+
+  const captionStyle = {
+    fontFamily: "'Caveat', cursive", fontSize: "11px", fontWeight: "700",
+    letterSpacing: "0.05em", color: "#73787C", lineHeight: 1,
+  };
+
+  const wineForSave = { ...wine, source: "lookup", reason: wine.description };
+
+  return (
+    <div style={{
+      background: "#f7f3ea", border: `2px solid #d6ccba`, borderRadius: "12px",
+      padding: "14px 18px 18px",
+      boxShadow: "2px 2px 0px rgba(0,0,0,0.06)",
+    }}>
+      {/* Header row: save left, rate right */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+        <button
+          onClick={() => onSave(wineForSave)}
+          title={isSaved ? "tap to remove from the cellar" : "save to the cellar"}
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
+            background: "none", border: "none", cursor: "pointer", padding: "2px 4px",
+            opacity: isSaved ? 1 : 0.7,
+            transition: "opacity 0.2s, transform 0.15s",
+            transform: isSaved ? "scale(1.05)" : "scale(1)",
+          }}
+        >
+          <WineGlassIcon size={22} color={glassColor} filled={isSaved} />
+          <span style={{ ...captionStyle, color: isSaved ? wineColor : "#73787C" }}>save</span>
+        </button>
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <button onClick={() => onRate(wine.name, "dislike")} style={ratingButtonStyle(rating === "dislike")}>
+              <CrossOutIcon size={18} color={rating === "dislike" ? RATING_COLORS.dislike : ratingGrey} />
+            </button>
+            <button onClick={() => onRate(wine.name, "like")} style={ratingButtonStyle(rating === "like")}>
+              <HeartIcon size={18} color={rating === "like" ? RATING_COLORS.like : ratingGrey} filled={rating === "like"} />
+            </button>
+            <button onClick={() => onRate(wine.name, "love")} style={ratingButtonStyle(rating === "love")}>
+              <DoubleHeartIcon size={18} color={rating === "love" ? RATING_COLORS.love : ratingGrey} />
+            </button>
+          </div>
+          <span style={captionStyle}>rate this</span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div>
+        <div style={{ fontFamily: "'Caveat', cursive", fontSize: "13px", fontWeight: "700", color: wine._approximate ? "#a07020" : "#1a2b5e", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>
+          {wine._approximate ? "best guess" : "about this wine"}
+        </div>
+        <div style={{ fontSize: "24px", fontFamily: "'Caveat', cursive", fontWeight: "700", color: "#1a1208", lineHeight: 1.15, marginBottom: "2px" }}>{wine.name}</div>
+        {wine.region && <div style={{ fontSize: "13px", color: "#a09070", fontFamily: "'Caveat', cursive", fontWeight: "500", marginBottom: "12px" }}>{wine.region}</div>}
+
+        {wine.caveat && (
+          <div style={{
+            background: "rgba(160,112,32,0.08)", borderLeft: `3px solid #a07020`,
+            padding: "8px 12px", borderRadius: "0 8px 8px 0", marginBottom: "14px",
+            fontSize: "12px", color: "#5a4218", fontFamily: "'Lora', serif",
+            fontStyle: "italic", lineHeight: 1.5,
+          }}>{wine.caveat}</div>
+        )}
+
+        <div style={{ fontSize: "14px", color: "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.6, marginBottom: "14px" }}>
+          {wine.description}
+        </div>
+
+        {wine.story && (
+          <div style={{
+            background: "rgba(26,43,94,0.05)", borderLeft: `3px solid #1a2b5e`,
+            padding: "10px 12px", borderRadius: "0 8px 8px 0", marginBottom: "14px",
+          }}>
+            <div style={{ fontFamily: "'Caveat', cursive", fontSize: "12px", fontWeight: "700", color: "#1a2b5e", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "4px" }}>worth knowing</div>
+            <div style={{ fontSize: "13px", color: "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.55, fontStyle: "italic" }}>{wine.story}</div>
+          </div>
+        )}
+
+        {wine.pairings && wine.pairings.length > 0 && (
+          <div style={{ marginBottom: wine.verdict ? "14px" : 0 }}>
+            <div style={{ fontFamily: "'Caveat', cursive", fontSize: "12px", fontWeight: "700", color: "#a09070", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>pairs with</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {wine.pairings.map((p, i) => (
+                <span key={i} style={{
+                  fontSize: "13px", color: "#3a2e1e", fontFamily: "'Lora', serif",
+                  background: "rgba(160,144,112,0.12)", padding: "4px 10px",
+                  borderRadius: "12px",
+                }}>{p}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {wine.verdict && (
+          <div style={{
+            background: "rgba(200,35,44,0.06)", border: `1px solid rgba(200,35,44,0.2)`,
+            padding: "10px 12px", borderRadius: "8px",
+          }}>
+            <div style={{ fontFamily: "'Caveat', cursive", fontSize: "12px", fontWeight: "700", color: "#c8232c", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "4px" }}>for you</div>
+            <div style={{ fontSize: "13px", color: "#3a2e1e", fontFamily: "'Lora', serif", lineHeight: 1.55 }}>{wine.verdict}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function WinePicker() {
+  // Mode: "recommend" (the original mad libs flow) or "lookup" (ask about a specific wine)
+  const [mode, setMode] = useState("recommend");
+
   const [image, setImage] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
   const [imageMime, setImageMime] = useState("image/jpeg");
@@ -410,14 +538,26 @@ export default function WinePicker() {
   const [desc3, setDesc3] = useState("");
   const [dontWant, setDontWant] = useState("");
   const [food, setFood] = useState("");
-  const [extras, setExtras] = useState([]);
-  const [extrasText, setExtrasText] = useState("");
   const [winesILove, setWinesILove] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [clarification, setClarification] = useState(null);
   const [noMatch, setNoMatch] = useState(null);
   const fileRef = useRef();
+  const lookupFileRef = useRef();
+
+  // Lookup mode state
+  const [lookupQuery, setLookupQuery] = useState("");
+  const [lookupImage, setLookupImage] = useState(null);
+  const [lookupImageBase64, setLookupImageBase64] = useState(null);
+  const [lookupImageMime, setLookupImageMime] = useState("image/jpeg");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupResult, setLookupResult] = useState(null); // the answer card
+  const [lookupCandidates, setLookupCandidates] = useState(null); // multi-wine pick step
+  const [lookupClarify, setLookupClarify] = useState(null); // { wineDescriptor, questions: [], answers: ["",""] }
+  const [lookupError, setLookupError] = useState(null);
+  // After saving a looked-up wine, ask "did I get this right?"
+  const [verdictPrompt, setVerdictPrompt] = useState(null);
 
   // Cellar
   const [cellarEntries, setCellarEntries] = useState(() => {
@@ -443,6 +583,11 @@ export default function WinePicker() {
   // Free-form notes the user adds when rating a wine (fed back into prompts)
   const [wineNotes, setWineNotes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("pmag_notes") || "{}"); } catch { return {}; }
+  });
+
+  // Feedback on lookup verdicts: how accurate was the model's description? Fed back into prompts.
+  const [verdictFeedback, setVerdictFeedback] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pmag_verdicts") || "{}"); } catch { return {}; }
   });
 
   // Modal: prompt for "where + what are you eating" before adding to cellar
@@ -476,7 +621,29 @@ export default function WinePicker() {
     const updated = [...cellarEntries, entry];
     setCellarEntries(updated);
     try { localStorage.setItem("pmag_cellar", JSON.stringify(updated)); } catch {}
+    const justSaved = entry;
     setSavePrompt(null);
+    // If this came from a lookup, ask whether the model's description was accurate
+    if (justSaved.source === "lookup") {
+      setVerdictPrompt({
+        wineKey: justSaved.name,
+        wineDescription: justSaved.reason || justSaved.description || "",
+        accuracy: null,
+        note: "",
+      });
+    }
+  };
+
+  // Called from the verdict modal: stores accuracy feedback
+  const confirmVerdict = () => {
+    if (!verdictPrompt) return;
+    const { wineKey, accuracy, note } = verdictPrompt;
+    if (accuracy) {
+      const updated = { ...verdictFeedback, [wineKey]: { accuracy, note: note.trim() || "", at: new Date().toISOString() } };
+      setVerdictFeedback(updated);
+      try { localStorage.setItem("pmag_verdicts", JSON.stringify(updated)); } catch {}
+    }
+    setVerdictPrompt(null);
   };
 
   // Tap on a rating: store it. If the rating became non-null, open notes modal.
@@ -539,16 +706,200 @@ export default function WinePicker() {
     }
   };
 
-  const toggleExtra = (e) => setExtras(prev =>
-    prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]
-  );
+  // Lookup mode: separate image upload pipeline, doesn't touch the recommendation flow's image state
+  const handleLookupImage = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLookupImage(URL.createObjectURL(file));
+    setLookupResult(null); setLookupCandidates(null); setLookupError(null);
+    const supported = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const mime = file.type || "image/jpeg";
+    if (supported.includes(mime)) {
+      setLookupImageMime(mime);
+      const reader = new FileReader();
+      reader.onload = ev => setLookupImageBase64(ev.target.result.split(",")[1]);
+      reader.readAsDataURL(file);
+    } else {
+      setLookupImageMime("image/jpeg");
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        setLookupImageBase64(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    }
+  };
+
+  const clearLookupImage = () => {
+    setLookupImage(null);
+    setLookupImageBase64(null);
+    if (lookupFileRef.current) lookupFileRef.current.value = "";
+  };
+
+  const hasLookupEnough = !!(lookupQuery.trim() || lookupImageBase64);
+
+  const buildLookupAnswerPrompt = (wineDescriptor, priorAnswers) => {
+    const parts = [];
+    parts.push(`The user is asking about this wine: ${wineDescriptor}`);
+    if (priorAnswers && priorAnswers.length) {
+      parts.push(`Additional details they provided when I asked: ${priorAnswers.map(a => `Q: ${a.q} A: ${a.a}`).join(" | ")}`);
+    }
+    if (food) parts.push(`They mentioned they may eat: ${food}`);
+    if (winesILove) parts.push(`Wines they already love (use to calibrate the verdict): ${winesILove}`);
+    const ratingCtx = buildRatingContext();
+    if (ratingCtx) parts.push(ratingCtx);
+    const verdictCtx = buildVerdictContext();
+    if (verdictCtx) parts.push(verdictCtx);
+    const personalize = Object.keys(wineRatings).length >= RATING_THRESHOLD;
+    const isFollowup = priorAnswers && priorAnswers.length > 0;
+
+    return `You are a knowledgeable sommelier. Concise, confident, dry wit. ${parts.join(". ")}
+
+Tell the user about this wine. ${personalize ? "Include a personalized verdict on whether they'll likely enjoy it, grounded in their taste history." : "Skip the personalized verdict — they don't have enough rating history yet, so do not speculate on whether they'll like it."}
+
+DECISION TREE (apply in order):
+
+1. **You confidently know the specific wine** (you can describe its real producer, region, style, vintage character without inventing) → return status "known" with full details.
+
+2. **You don't recognize this exact wine BUT you'd be guessing** → ${isFollowup
+  ? `the user has already answered earlier follow-up questions, so DO NOT ask again. Skip to step 4 (approximate).`
+  : `return status "clarify" with EXACTLY two short questions that would help you pin it down. Good questions: producer, vintage, region/appellation, grape, where they saw it. Bad questions: vague taste preferences. Make the questions specific and answerable in a few words.`}
+
+3. **The descriptor is so vague that even with answers you couldn't help** (e.g. just "a Cab") → return status "clarify" with two narrowing questions.
+
+4. **You don't know the specific bottle but you DO know enough about its category** (e.g. "Vena Cava 2019 Sauvignon Blanc from Baja California" — you may not know that exact producer, but you know Baja California Sauvignon Blanc as a category and what 2019 was like there) → return status "approximate" with your best inferred answer based on the grape + region + vintage. Be honest in the "caveat" field about what you couldn't pin down. Still produce a real, useful description / story / pairings the user can act on.
+
+CRITICAL: Never invent specific producer facts, awards, or scores you don't actually know. If you must approximate, the description should be about the grape/region/vintage in general, NOT fabricated specifics about the producer. The "caveat" field is where you say "I don't have specifics on this exact producer, but here's what to expect from this category."
+
+Style rules:
+- "name": clean specific wine name, e.g. "Mullineux Kloof Street Rouge 2021" or "Chablis Premier Cru Vaillons" — never with editorial brackets
+- "region": grape, region, country — e.g. "Syrah blend, Swartland, South Africa"
+- "description": 2 sentences — what it is, how it tastes
+- "story": 1-2 sentences — something genuinely interesting. For approximate answers, this should be about the appellation, vintage, or category — not invented producer history.
+- "pairings": array of 2-3 specific food suggestions
+- "verdict": ${personalize ? "1-2 sentences: will they like it, and why, based on their history" : "empty string"}
+- "caveat" (approximate only): 1 sentence explaining what you knew vs guessed, e.g. "I don't have notes on this specific producer, but Baja California Sauv Blancs from 2019 generally..."
+
+Return ONLY this JSON, no markdown:
+FORMAT KNOWN: {"status":"known","wine":{"name":"...","region":"...","description":"...","story":"...","pairings":["...","...","..."],"verdict":"..."}}
+FORMAT APPROXIMATE: {"status":"approximate","wine":{"name":"...","region":"...","description":"...","story":"...","pairings":["...","...","..."],"verdict":"...","caveat":"..."}}
+FORMAT CLARIFY: {"status":"clarify","questions":["question 1?","question 2?"]}`;
+  };
+
+  const buildLookupIdentifyPrompt = () => {
+    return `You are a sommelier looking at a photo. Your job: identify the wine(s) visible in the image.
+
+If the photo shows ONE wine clearly (a single bottle/label, or a single row of a menu), return status "single".
+If the photo shows MULTIPLE wines (a menu page with several wines, or several bottles), return status "multiple" with a list so the user can pick which one they want to know about.
+If you can't make out any wine clearly, return status "unreadable".
+
+Return ONLY this JSON, no markdown:
+FORMAT SINGLE: {"status":"single","wine":"clean wine identifier as you read it, e.g. 'Domaine Tempier Bandol Rouge 2019'"}
+FORMAT MULTIPLE: {"status":"multiple","wines":["wine 1 as on menu","wine 2 as on menu","wine 3 as on menu"]}
+FORMAT UNREADABLE: {"status":"unreadable"}`;
+  };
+
+  // Single place to interpret a lookup answer response
+  const applyLookupAnswer = (parsed, wineDescriptor) => {
+    if (parsed.status === "known" || parsed.status === "approximate") {
+      setLookupResult({ ...parsed.wine, _approximate: parsed.status === "approximate" });
+      setLookupClarify(null);
+    } else if (parsed.status === "clarify" && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+      setLookupClarify({
+        wineDescriptor,
+        questions: parsed.questions.slice(0, 2),
+        answers: parsed.questions.slice(0, 2).map(() => ""),
+      });
+    } else {
+      setLookupError("Couldn't pull together a confident answer — try adding more detail.");
+    }
+  };
+
+  // Two-step photo flow: identify → (pick if needed) → answer
+  // Text-only flow: skip step 1, go straight to answer
+  const handleLookupSubmit = async () => {
+    if (!hasLookupEnough) return;
+    setLookupLoading(true);
+    setLookupResult(null); setLookupCandidates(null); setLookupClarify(null); setLookupError(null);
+    try {
+      // If there's text, prefer answering the text query directly (no need to identify)
+      if (lookupQuery.trim()) {
+        const desc = lookupQuery.trim();
+        const parsed = await callAPI(buildLookupAnswerPrompt(desc, null), null);
+        applyLookupAnswer(parsed, desc);
+        return;
+      }
+
+      // Photo-only path: identify first
+      const lookupImg = { data: lookupImageBase64, mime: lookupImageMime };
+      const idParsed = await callAPI(buildLookupIdentifyPrompt(), lookupImg);
+      if (idParsed.status === "unreadable") {
+        setLookupError("I couldn't read the photo clearly — try a closer/sharper shot.");
+        return;
+      }
+      if (idParsed.status === "multiple") {
+        setLookupCandidates(idParsed.wines);
+        return; // wait for user to pick
+      }
+      // status === "single"
+      const answerParsed = await callAPI(buildLookupAnswerPrompt(idParsed.wine, null), null);
+      applyLookupAnswer(answerParsed, idParsed.wine);
+    } catch {
+      setLookupError("Something went wrong — try again.");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  // User picked a wine from the multi-wine candidates list
+  const handleLookupPick = async (wineDescriptor) => {
+    setLookupLoading(true);
+    setLookupCandidates(null);
+    try {
+      const parsed = await callAPI(buildLookupAnswerPrompt(wineDescriptor, null), null);
+      applyLookupAnswer(parsed, wineDescriptor);
+    } catch {
+      setLookupError("Something went wrong — try again.");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  // User answered the clarifying questions — submit answers back to the model
+  const handleLookupClarifySubmit = async () => {
+    if (!lookupClarify) return;
+    const { wineDescriptor, questions, answers } = lookupClarify;
+    const priorAnswers = questions.map((q, i) => ({ q, a: answers[i].trim() })).filter(x => x.a);
+    setLookupLoading(true);
+    setLookupClarify(null);
+    try {
+      // Force fallback to approximate if clarification yields nothing useful
+      const parsed = await callAPI(buildLookupAnswerPrompt(wineDescriptor, priorAnswers), null);
+      applyLookupAnswer(parsed, wineDescriptor);
+    } catch {
+      setLookupError("Something went wrong — try again.");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const resetLookup = () => {
+    setLookupResult(null); setLookupCandidates(null); setLookupClarify(null); setLookupError(null);
+    setLookupQuery(""); clearLookupImage();
+  };
 
   const hasEnough = wineTypes.length || desc1 || desc2 || desc3 || food;
 
-  // Summarize past ratings for the model so it learns from the user's taste over time
+  // Summarize past ratings for the model so it learns from the user's taste over time.
+  // Cold-start: stays empty until the user has at least RATING_THRESHOLD ratings, so early
+  // recommendations rely only on what they're asking for in this moment.
   const buildRatingContext = () => {
     const entries = Object.entries(wineRatings);
-    if (!entries.length) return "";
+    if (entries.length < RATING_THRESHOLD) return "";
     const fmt = (k) => {
       const note = wineNotes[k];
       return note ? `${k} — note: "${note}"` : k;
@@ -557,14 +908,17 @@ export default function WinePicker() {
     const liked = entries.filter(([, r]) => r === "like").map(([k]) => fmt(k)).slice(0, 12);
     const disliked = entries.filter(([, r]) => r === "dislike").map(([k]) => fmt(k)).slice(0, 12);
     const out = [];
-    if (loved.length) out.push(`Wines/styles they LOVED previously (lean strongly toward this profile, take notes seriously): ${loved.join("; ")}`);
-    if (liked.length) out.push(`Wines/styles they LIKED previously (good calibration signal, notes give nuance): ${liked.join("; ")}`);
-    if (disliked.length) out.push(`Wines/styles they DID NOT like (avoid this profile; notes explain why): ${disliked.join("; ")}`);
+    out.push(`Background taste history (use only as a tiebreaker after honoring their CURRENT ask above; do not override the wine type, descriptors, dealbreakers, or food they specified just now)`);
+    if (loved.length) out.push(`previously loved: ${loved.join("; ")}`);
+    if (liked.length) out.push(`previously liked: ${liked.join("; ")}`);
+    if (disliked.length) out.push(`previously disliked: ${disliked.join("; ")}`);
     return out.join(". ");
   };
 
-  // Saved-with-context history: where they were, what they were eating
+  // Saved-with-context history: where they were, what they were eating.
+  // Same cold-start gate as buildRatingContext.
   const buildSaveContext = () => {
+    if (Object.keys(wineRatings).length < RATING_THRESHOLD) return "";
     const withCtx = cellarEntries
       .filter(e => e.savedContext && (e.savedContext.location || e.savedContext.food))
       .slice(-10);
@@ -576,7 +930,26 @@ export default function WinePicker() {
       if (c.location) parts.push(`at ${c.location}`);
       return `${e.name} (${parts.join(", ")})`;
     });
-    return `Wines they saved alongside specific food/places (use to spot pairing patterns): ${lines.join("; ")}`;
+    return `Background pairing history (only use as a tiebreaker, never to override the current ask): ${lines.join("; ")}`;
+  };
+
+  // Verdict feedback: which lookup descriptions were accurate vs off.
+  // Gated on the same threshold so it only enters once there's enough history to be meaningful.
+  const buildVerdictContext = () => {
+    const entries = Object.entries(verdictFeedback);
+    if (!entries.length || Object.keys(wineRatings).length < RATING_THRESHOLD) return "";
+    const off = entries.filter(([, v]) => v.accuracy === "off");
+    const partial = entries.filter(([, v]) => v.accuracy === "partial");
+    const out = [];
+    if (off.length) {
+      const summary = off.slice(0, 6).map(([k, v]) => v.note ? `${k}: "${v.note}"` : k).join("; ");
+      out.push(`Past lookup descriptions the user flagged as wrong (be more careful with similar wines): ${summary}`);
+    }
+    if (partial.length) {
+      const summary = partial.slice(0, 6).map(([k, v]) => v.note ? `${k}: "${v.note}"` : k).join("; ");
+      out.push(`Past lookup descriptions the user flagged as partially right: ${summary}`);
+    }
+    return out.join(". ");
   };
 
   const buildFirstPassPrompt = () => {
@@ -586,17 +959,27 @@ export default function WinePicker() {
     if (descs.length) parts.push(`Descriptors: ${descs.join(", ")}`);
     if (dontWant) parts.push(`Dealbreakers (must avoid): ${dontWant}`);
     if (food) parts.push(`Food: ${food}`);
-    if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
     if (winesILove) parts.push(`Wines they already love (use to calibrate style): ${winesILove}`);
     const ratingCtx = buildRatingContext();
     if (ratingCtx) parts.push(ratingCtx);
     const saveCtx = buildSaveContext();
     if (saveCtx) parts.push(saveCtx);
+    const verdictCtx = buildVerdictContext();
+    if (verdictCtx) parts.push(verdictCtx);
 
     if (imageBase64) {
       return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. I have uploaded a photo of a by-the-glass wine list. My preferences: ${parts.join(". ")}
 
 MISMATCH RULE: A mismatch occurs when you cannot find a wine on the list that both (a) pairs well with the food AND (b) matches at least 2 of the stated style criteria. If mismatch, do NOT force bad picks. Scan the ENTIRE list. Food pairing is top priority.
+
+PRIORITY HIERARCHY (apply in order, never let a lower one override a higher one):
+1. Wine type / color the user just selected (red, white, rosé, orange, sparkling) — non-negotiable when stated
+2. Descriptors / adjectives the user just typed (the mad libs)
+3. Food they're eating right now
+4. Dealbreakers they listed
+5. Wines they said they already love (calibration)
+6. Background taste history, if any (only as tiebreaker between picks that all satisfy 1-5)
+The user's CURRENT ask in this conversation always outranks their history. If they ask for white tonight, never recommend a red just because they've loved reds before.
 
 Return ONLY one of these JSON formats, no markdown:
 FORMAT A: {"status":"match","picks":[{"name":"wine name as on menu","grape":"grape/region","reason":"1-2 sentences, confident"},{"name":"...","grape":"...","reason":"..."},{"name":"...","grape":"...","reason":"wildcard - most interesting on list"}]}
@@ -605,6 +988,15 @@ FORMAT B: {"status":"clarify","intro":"honest 1-2 sentence explanation","questio
       return `You are a knowledgeable sommelier at a great wine bar. Concise, confident, dry wit. No wine list — give exactly 4 specific style-based recommendations tailored tightly to what the person asked for. My preferences: ${parts.join(". ")}
 
 Food pairing is top priority. 
+
+PRIORITY HIERARCHY (apply in order, never let a lower one override a higher one):
+1. Wine type / color the user just selected (red, white, rosé, orange, sparkling) — non-negotiable when stated
+2. Descriptors / adjectives the user just typed (the mad libs)
+3. Food they're eating right now
+4. Dealbreakers they listed
+5. Wines they said they already love (calibration)
+6. Background taste history, if any (only as tiebreaker between picks that all satisfy 1-5)
+The user's CURRENT ask in this conversation always outranks their history. If they ask for white tonight, never recommend a red just because they've loved reds before.
 
 Style naming rules — this is critical:
 - The "style" field must be a clean, specific wine name a sommelier would say out loud: "Chablis Premier Cru", "Ribera del Duero Reserva", "Swartland Chenin Blanc", "Barolo", "Grüner Veltliner Smaragd"
@@ -634,12 +1026,13 @@ Return ONLY this JSON, no markdown:
     if (food) parts.push(`Food: ${food}`);
     if (clarificationAnswers.foodFirst === "yes") parts.push("User is open to wine type that pairs best with the food even if it differs from original request");
     if (clarificationAnswers.wineType === "must") parts.push(`User insists on ${wineType} — prioritize this even if food pairing is imperfect`);
-    if (extras.length || extrasText) parts.push(`Also care about: ${[...extras, extrasText].filter(Boolean).join(", ")}`);
     if (winesILove) parts.push(`Wines they already love (use to calibrate style): ${winesILove}`);
     const ratingCtx = buildRatingContext();
     if (ratingCtx) parts.push(ratingCtx);
     const saveCtx = buildSaveContext();
     if (saveCtx) parts.push(saveCtx);
+    const verdictCtx = buildVerdictContext();
+    if (verdictCtx) parts.push(verdictCtx);
 
     return `You are a knowledgeable sommelier who works at a great wine bar. Concise, confident, dry wit.
 
@@ -661,10 +1054,11 @@ Otherwise return:
 No markdown, no extra text.`;
   };
 
-  const callAPI = async (prompt) => {
-    const msgContent = imageBase64
+  const callAPI = async (prompt, imgOverride) => {
+    const img = imgOverride !== undefined ? imgOverride : (imageBase64 ? { data: imageBase64, mime: imageMime } : null);
+    const msgContent = img
       ? [
-          { type: "image", source: { type: "base64", media_type: imageMime, data: imageBase64 } },
+          { type: "image", source: { type: "base64", media_type: img.mime, data: img.data } },
           { type: "text", text: prompt }
         ]
       : [{ type: "text", text: prompt }];
@@ -760,6 +1154,33 @@ No markdown, no extra text.`;
 
       <div style={{ maxWidth: "520px", margin: "0 auto", padding: "28px 20px 56px" }}>
 
+        {/* Mode toggle */}
+        <div style={{
+          display: "flex", gap: "0",
+          background: C.paper, border: `2px solid ${C.border}`, borderRadius: "12px",
+          padding: "4px", marginBottom: "20px",
+        }}>
+          {[
+            { key: "recommend", label: "find me a wine" },
+            { key: "lookup", label: "look up a wine" },
+          ].map(m => (
+            <button
+              key={m.key}
+              onClick={() => setMode(m.key)}
+              style={{
+                flex: 1, padding: "10px 14px", borderRadius: "8px",
+                background: mode === m.key ? C.red : "transparent",
+                color: mode === m.key ? "#fff" : C.mutedDark,
+                border: "none", cursor: "pointer",
+                fontFamily: "'Caveat', cursive", fontSize: "16px", fontWeight: "700",
+                letterSpacing: "0.03em", transition: "all 0.15s",
+              }}
+            >{m.label}</button>
+          ))}
+        </div>
+
+        {mode === "recommend" && (<>
+
         {/* Photo upload */}
         <div onClick={() => fileRef.current.click()} style={{
           border: `2.5px dashed ${image ? C.red : C.border}`,
@@ -828,43 +1249,6 @@ No markdown, no extra text.`;
             <BlankInput value={food} onChange={setFood} placeholder="___" suggestions={FOOD_SUGGESTIONS} width="130px" />
             {"."}
           </div>
-        </div>
-
-        {/* Extras */}
-        <div style={{
-          background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
-          padding: "18px 20px", marginBottom: "16px",
-          boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
-        }}>
-          <div style={{
-            fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
-            color: C.blue, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px",
-          }}>other things I care about</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-            {EXTRAS.map(e => {
-              const sel = extras.includes(e);
-              return (
-                <button key={e} onClick={() => toggleExtra(e)} style={{
-                  padding: "6px 14px", borderRadius: "20px",
-                  border: `2px solid ${sel ? C.red : C.chipBorder}`,
-                  background: sel ? "rgba(200,35,44,0.08)" : C.chip,
-                  color: sel ? C.red : C.mutedDark,
-                  fontSize: "14px", fontFamily: "'Caveat', cursive",
-                  fontWeight: sel ? "700" : "500", cursor: "pointer", transition: "all 0.15s",
-                }}>{e}</button>
-              );
-            })}
-          </div>
-          <input
-            value={extrasText}
-            onChange={e => setExtrasText(e.target.value)}
-            placeholder="anything else... something from the Rhône, not too oaky..."
-            style={{
-              width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
-              borderRadius: "10px", color: C.text, fontSize: "14px",
-              fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "9px 14px", outline: "none",
-            }}
-          />
         </div>
 
         {/* Wines I love */}
@@ -958,6 +1342,199 @@ No markdown, no extra text.`;
             </div>
           </div>
         )}
+
+        </>)}
+
+        {mode === "lookup" && (<>
+          {/* Photo (optional) */}
+          <div onClick={() => lookupFileRef.current && lookupFileRef.current.click()} style={{
+            border: `2.5px dashed ${lookupImage ? C.red : C.border}`,
+            borderRadius: "12px", minHeight: lookupImage ? "auto" : "96px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", overflow: "hidden",
+            background: lookupImage ? C.paper : "rgba(255,255,255,0.4)",
+            marginBottom: "16px", transition: "all 0.2s",
+            position: "relative",
+          }}>
+            {lookupImage
+              ? <>
+                  <img src={lookupImage} alt="Wine" style={{ width: "100%", maxHeight: "200px", objectFit: "cover", display: "block" }} />
+                  <button onClick={(e) => { e.stopPropagation(); clearLookupImage(); }} style={{
+                    position: "absolute", top: "8px", right: "8px",
+                    background: "rgba(0,0,0,0.55)", color: "#fff", border: "none",
+                    borderRadius: "50%", width: "26px", height: "26px",
+                    cursor: "pointer", fontSize: "16px", lineHeight: 1,
+                  }}>×</button>
+                </>
+              : <div style={{ textAlign: "center", color: C.muted, padding: "20px" }}>
+                  <div style={{ fontSize: "30px", marginBottom: "6px" }}>📸</div>
+                  <div style={{ fontFamily: "'Caveat', cursive", fontSize: "16px", fontWeight: "600" }}>snap the bottle or one row of a menu</div>
+                  <div style={{ fontFamily: "'Lora', serif", fontSize: "12px", fontStyle: "italic", marginTop: "2px" }}>optional</div>
+                </div>}
+            <input ref={lookupFileRef} type="file" accept="image/*" onChange={handleLookupImage} style={{ display: "none" }} />
+          </div>
+
+          {/* Text input */}
+          <div style={{
+            background: C.paper, border: `2px solid ${C.border}`, borderRadius: "14px",
+            padding: "18px 20px", marginBottom: "20px",
+            boxShadow: "2px 2px 0px rgba(0,0,0,0.05)",
+          }}>
+            <div style={{
+              fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
+              color: C.blue, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "10px",
+            }}>tell me about this wine</div>
+            <textarea
+              value={lookupQuery}
+              onChange={e => setLookupQuery(e.target.value)}
+              placeholder="type of wine? producer? wine name? vintage? description from menu?"
+              rows={3}
+              style={{
+                width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+                borderRadius: "10px", color: C.text, fontSize: "15px",
+                fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "10px 14px", outline: "none",
+                resize: "vertical", lineHeight: 1.4,
+              }}
+            />
+          </div>
+
+          {/* Submit / loading / candidates / clarify / result / error */}
+          {!lookupLoading && !lookupResult && !lookupCandidates && !lookupClarify && !lookupError && (
+            <button
+              onClick={handleLookupSubmit}
+              disabled={!hasLookupEnough}
+              style={{
+                width: "100%", padding: "14px",
+                background: hasLookupEnough ? C.red : C.border,
+                color: "#fff", border: "none", borderRadius: "12px",
+                fontSize: "18px", fontFamily: "'Caveat', cursive", fontWeight: "700",
+                cursor: hasLookupEnough ? "pointer" : "not-allowed",
+                boxShadow: hasLookupEnough ? "2px 2px 0px rgba(200,35,44,0.25)" : "none",
+                transition: "all 0.15s",
+              }}
+            >look it up →</button>
+          )}
+
+          {lookupLoading && (
+            <div style={{ textAlign: "center", padding: "30px 20px" }}>
+              <div style={{ fontFamily: "'Caveat', cursive", fontSize: "18px", color: C.red, fontWeight: "600" }}>checking the cellar in my head...</div>
+            </div>
+          )}
+
+          {lookupCandidates && (
+            <div style={{
+              background: C.paper, border: `2px solid ${C.blue}`, borderRadius: "14px",
+              padding: "18px 20px", marginBottom: "16px",
+              boxShadow: "2px 2px 0px rgba(26,43,94,0.1)",
+            }}>
+              <div style={{ fontFamily: "'Caveat', cursive", fontSize: "20px", fontWeight: "700", color: C.blue, marginBottom: "4px" }}>which one?</div>
+              <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, fontStyle: "italic", marginBottom: "14px" }}>I see a few wines in that photo</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {lookupCandidates.map((w, i) => (
+                  <button key={i} onClick={() => handleLookupPick(w)} style={{
+                    textAlign: "left", padding: "12px 14px",
+                    background: C.chip, border: `2px solid ${C.chipBorder}`,
+                    borderRadius: "10px", cursor: "pointer",
+                    fontFamily: "'Caveat', cursive", fontSize: "16px", fontWeight: "600",
+                    color: C.text,
+                  }}>{w}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {lookupClarify && (
+            <div style={{
+              background: C.paper, border: `2px solid ${C.blue}`, borderRadius: "14px",
+              padding: "18px 20px", marginBottom: "16px",
+              boxShadow: "2px 2px 0px rgba(26,43,94,0.1)",
+            }}>
+              <div style={{ fontFamily: "'Caveat', cursive", fontSize: "20px", fontWeight: "700", color: C.blue, marginBottom: "4px" }}>a couple of quick questions</div>
+              <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, fontStyle: "italic", marginBottom: "14px" }}>
+                this'll help me give you a better answer — answer what you can, skip what you don't know
+              </div>
+
+              {lookupClarify.questions.map((q, i) => (
+                <div key={i} style={{ marginBottom: "12px" }}>
+                  <label style={{
+                    display: "block", marginBottom: "6px",
+                    fontFamily: "'Caveat', cursive", fontSize: "14px", fontWeight: "700",
+                    color: C.text, letterSpacing: "0.03em",
+                  }}>{q}</label>
+                  <input
+                    value={lookupClarify.answers[i]}
+                    onChange={e => {
+                      const newAnswers = [...lookupClarify.answers];
+                      newAnswers[i] = e.target.value;
+                      setLookupClarify({ ...lookupClarify, answers: newAnswers });
+                    }}
+                    placeholder="not sure? leave blank"
+                    style={{
+                      width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+                      borderRadius: "10px", color: C.text, fontSize: "15px",
+                      fontFamily: "'Caveat', cursive", fontWeight: "500", padding: "9px 14px", outline: "none",
+                    }}
+                  />
+                </div>
+              ))}
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
+                <button
+                  onClick={() => { setLookupClarify(null); resetLookup(); }}
+                  style={{
+                    flex: "0 0 auto", padding: "10px 16px",
+                    background: "none", color: C.muted, border: `2px solid ${C.border}`,
+                    borderRadius: "10px", fontSize: "15px",
+                    fontFamily: "'Caveat', cursive", fontWeight: "600", cursor: "pointer",
+                  }}
+                >start over</button>
+                <button
+                  onClick={handleLookupClarifySubmit}
+                  style={{
+                    flex: 1, padding: "10px",
+                    background: C.red, color: "#fff", border: "none",
+                    borderRadius: "10px", fontSize: "16px",
+                    fontFamily: "'Caveat', cursive", fontWeight: "700", cursor: "pointer",
+                    boxShadow: "2px 2px 0px rgba(200,35,44,0.25)",
+                  }}
+                >give me your best answer →</button>
+              </div>
+            </div>
+          )}
+
+          {lookupError && (
+            <div style={{
+              background: C.paper, border: `2px solid ${C.muted}`, borderRadius: "14px",
+              padding: "18px 20px", marginBottom: "16px",
+            }}>
+              <div style={{ fontFamily: "'Lora', serif", fontSize: "14px", color: C.text, lineHeight: 1.5 }}>{lookupError}</div>
+              <button onClick={resetLookup} style={{
+                marginTop: "12px", padding: "8px 16px",
+                background: "none", color: C.red, border: `2px solid ${C.red}`,
+                borderRadius: "8px", cursor: "pointer",
+                fontFamily: "'Caveat', cursive", fontSize: "15px", fontWeight: "700",
+              }}>try again</button>
+            </div>
+          )}
+
+          {lookupResult && (
+            <div style={{ animation: "fadeUp 0.35s ease both" }}>
+              <LookupCard
+                wine={lookupResult}
+                onSave={handleSaveWine}
+                isSaved={savedNames.has(lookupResult.name)}
+                rating={wineRatings[lookupResult.name] || null}
+                onRate={handleRate}
+              />
+              <div style={{ textAlign: "center", marginTop: "22px" }}>
+                <button onClick={resetLookup} style={{
+                  fontSize: "16px", color: C.muted, background: "none", border: "none",
+                  cursor: "pointer", fontFamily: "'Caveat', cursive", fontWeight: "600",
+                }}>↺ look up another</button>
+              </div>
+            </div>
+          )}
+        </>)}
       </div>
 
       <div style={{
@@ -1080,6 +1657,94 @@ No markdown, no extra text.`;
                 fontFamily: "'Caveat', cursive", fontWeight: "700", cursor: "pointer",
                 boxShadow: "2px 2px 0px rgba(200,35,44,0.25)",
               }}>save thoughts →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Verdict accuracy modal — appears after saving a looked-up wine */}
+      {verdictPrompt && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+          <div onClick={() => setVerdictPrompt(null)} style={{ position: "absolute", inset: 0, background: "rgba(26,18,8,0.55)" }} />
+          <div style={{
+            position: "relative", width: "min(440px, 100%)",
+            background: C.paper, border: `2px solid ${C.blue}`, borderRadius: "16px",
+            padding: "26px 24px 22px",
+            boxShadow: "4px 4px 0px rgba(26,43,94,0.18)",
+            animation: "fadeUp 0.25s ease both",
+          }}>
+            <div style={{ fontFamily: "'Caveat', cursive", fontSize: "26px", fontWeight: "700", color: C.red, lineHeight: 1.1 }}>
+              did I get it right?
+            </div>
+            <div style={{ fontFamily: "'Lora', serif", fontSize: "13px", color: C.muted, fontStyle: "italic", marginTop: "4px", marginBottom: "14px" }}>
+              your feedback helps me describe wines better next time
+            </div>
+
+            {verdictPrompt.wineDescription && (
+              <div style={{
+                background: C.chip, border: `2px solid ${C.chipBorder}`,
+                borderRadius: "10px", padding: "10px 12px", marginBottom: "16px",
+                fontFamily: "'Lora', serif", fontSize: "13px", color: C.textBody,
+                lineHeight: 1.5, fontStyle: "italic",
+              }}>
+                "{verdictPrompt.wineDescription}"
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+              {[
+                { key: "accurate", label: "spot on", color: "#2a7d4f" },
+                { key: "partial", label: "partly", color: "#a07020" },
+                { key: "off", label: "not really", color: RATING_COLORS.love },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setVerdictPrompt({ ...verdictPrompt, accuracy: opt.key })}
+                  style={{
+                    padding: "12px 14px", textAlign: "left",
+                    background: verdictPrompt.accuracy === opt.key ? `${opt.color}15` : C.chip,
+                    border: `2px solid ${verdictPrompt.accuracy === opt.key ? opt.color : C.chipBorder}`,
+                    borderRadius: "10px", cursor: "pointer",
+                    fontFamily: "'Caveat', cursive", fontSize: "16px",
+                    fontWeight: verdictPrompt.accuracy === opt.key ? "700" : "500",
+                    color: verdictPrompt.accuracy === opt.key ? opt.color : C.text,
+                    transition: "all 0.15s",
+                  }}
+                >{opt.label}</button>
+              ))}
+            </div>
+
+            {verdictPrompt.accuracy && verdictPrompt.accuracy !== "accurate" && (
+              <textarea
+                value={verdictPrompt.note}
+                onChange={e => setVerdictPrompt({ ...verdictPrompt, note: e.target.value })}
+                placeholder={verdictPrompt.accuracy === "off" ? "what was wrong? e.g. it was much fuller-bodied than described..." : "what was off? optional..."}
+                rows={3}
+                style={{
+                  width: "100%", background: C.chip, border: `2px solid ${C.chipBorder}`,
+                  borderRadius: "10px", color: C.text, fontSize: "14px",
+                  fontFamily: "'Lora', serif", fontWeight: "400", padding: "10px 12px", outline: "none",
+                  marginBottom: "16px", resize: "vertical", lineHeight: 1.5,
+                }}
+              />
+            )}
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setVerdictPrompt(null)} style={{
+                flex: "0 0 auto", padding: "12px 18px",
+                background: "none", color: C.muted, border: `2px solid ${C.border}`,
+                borderRadius: "10px", fontSize: "15px",
+                fontFamily: "'Caveat', cursive", fontWeight: "600", cursor: "pointer",
+              }}>skip</button>
+              <button onClick={confirmVerdict} disabled={!verdictPrompt.accuracy} style={{
+                flex: 1, padding: "12px",
+                background: verdictPrompt.accuracy ? C.red : C.border,
+                color: "#fff", border: "none",
+                borderRadius: "10px", fontSize: "16px",
+                fontFamily: "'Caveat', cursive", fontWeight: "700",
+                cursor: verdictPrompt.accuracy ? "pointer" : "not-allowed",
+                boxShadow: verdictPrompt.accuracy ? "2px 2px 0px rgba(200,35,44,0.25)" : "none",
+              }}>send →</button>
             </div>
           </div>
         </div>
